@@ -10,7 +10,7 @@ public class SingleLinkedList implements Serializable {
     Node header;
     int size;
 
-    static class Node {
+    static class Node implements Serializable {
 
         Node next;
         int elem;
