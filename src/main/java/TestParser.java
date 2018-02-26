@@ -26,11 +26,21 @@ import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedList;
 
 /**
+ * This file extracts the statements for variable declarations and assertions in the test source via JavaParser.
+ *
+ * Write Step:
+ * Before each assertion, all of the previously declared variables are sent a function, where they are serialized and written to disk.
+ *
+ * Read Step:
+ * The generated split tests are created together with the proper read functions.
+ * These read calls read the serialized object, deserialize and downcast to proper object.
+ *
  * Created by od on 25.02.2018.
  */
 public class TestParser {
@@ -70,6 +80,7 @@ public class TestParser {
 
                 methods = new ArrayList<>();
 
+                // Generating splitted methods.
                 variables.add(0, "%");
                 types.add(0, "%");
 
@@ -117,6 +128,7 @@ public class TestParser {
                         block.addStatement(s.clone());
                 }
 
+                // Inserting Writes to the actual source code.
                 variables.remove(0);
                 types.remove(0);
                 index = 0;
@@ -138,7 +150,6 @@ public class TestParser {
 
                     NameExpr clazz = new NameExpr("Transformator.ObjectRecorder");
                     MethodCallExpr call = new MethodCallExpr(clazz, "writeObject");
-                    call.addArgument(new StringLiteralExpr(s));
                     call.addArgument(s);
                     expressions.add(call);
                 }
@@ -157,6 +168,11 @@ public class TestParser {
         ClassOrInterfaceDeclaration cls = cu.getClassByName("SingleLinkedListTest").get();
         for (MethodDeclaration m : methods)
             cls.addMember(m);
-        System.out.println(cu);
+
+        cls.setName("GeneratedTest");
+        FileWriter fw = new FileWriter(new File(".\\src\\main\\java\\Sample1\\GeneratedTest.java"));
+        fw.append(cu.toString().replaceAll("ı", "i"));
+        fw.flush();
+        fw.close();
     }
 }
