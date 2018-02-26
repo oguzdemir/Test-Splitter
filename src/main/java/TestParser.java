@@ -163,14 +163,14 @@ public class TestParser {
                 System.getProperty("user.dir"));
 
         CompilationUnit cu = JavaParser.parse(new FileInputStream(
-                new File(".\\src\\main\\java\\Sample1\\SingleLinkedListTest.java")));
+                new File("./src/main/java/Sample1/SingleLinkedListTest.java")));
         cu.accept(new MyVisitor(), null);
         ClassOrInterfaceDeclaration cls = cu.getClassByName("SingleLinkedListTest").get();
         for (MethodDeclaration m : methods)
             cls.addMember(m);
 
         cls.setName("GeneratedTest");
-        FileWriter fw = new FileWriter(new File(".\\src\\main\\java\\Sample1\\GeneratedTest.java"));
+        FileWriter fw = new FileWriter(new File("./src/main/java/Sample1/GeneratedTest.java"));
         fw.append(cu.toString().replaceAll("ı", "i"));
         fw.flush();
         fw.close();
