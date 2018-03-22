@@ -1,6 +1,5 @@
-package Sample2;
+package Samples.Sample2;
 
-import Sample1.SingleLinkedList;
 import Transformator.ObjectRecorder;
 import org.junit.Test;
 

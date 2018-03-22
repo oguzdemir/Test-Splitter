@@ -1,4 +1,4 @@
-package Sample1;
+package Samples.Sample1;
 
 import Transformator.ObjectRecorder;
 import org.junit.Test;

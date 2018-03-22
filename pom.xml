@@ -20,7 +20,7 @@
                 </configuration>
             </plugin>
         </plugins>
-        <testSourceDirectory>src/test/</testSourceDirectory>
+        <testSourceDirectory>src/main/java/Samples</testSourceDirectory>
     </build>
 
     <dependencies>

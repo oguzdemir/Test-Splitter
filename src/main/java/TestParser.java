@@ -33,14 +33,14 @@ import java.util.LinkedList;
 
 /**
  * This file extracts the statements for variable declarations and assertions in the test source via JavaParser.
- *
+ * <p>
  * Write Step:
  * Before each assertion, all of the previously declared variables are sent a function, where they are serialized and written to disk.
- *
+ * <p>
  * Read Step:
  * The generated split tests are created together with the proper read functions.
  * These read calls read the serialized object, deserialize and downcast to proper object.
- *
+ * <p>
  * Created by od on 25.02.2018.
  */
 public class TestParser {
@@ -48,10 +48,17 @@ public class TestParser {
     static ArrayList<MethodDeclaration> methods;
 
     static class MyVisitor extends VoidVisitorAdapter<Object> {
+
+        String methodName;
+
+        public MyVisitor(String methodName) {
+            this.methodName = methodName;
+        }
+
         @Override
         public void visit(MethodDeclaration n, Object arg) {
 
-            if (n.getName().toString().equals("testS0")) {
+            if (n.getName().toString().equals(methodName)) {
                 boolean finished = false;
 
                 ArrayList<String> variables = new ArrayList<>();
@@ -158,19 +165,29 @@ public class TestParser {
         }
     }
 
-    public static void main(String... args) throws Exception {
-        System.out.println("Working Directory = " +
-                System.getProperty("user.dir"));
+    public static void main(String[] args) throws Exception {
 
-        CompilationUnit cu = JavaParser.parse(new FileInputStream(
-                new File("./src/main/java/Sample1/SingleLinkedListTest.java")));
-        cu.accept(new MyVisitor(), null);
-        ClassOrInterfaceDeclaration cls = cu.getClassByName("SingleLinkedListTest").get();
+        if (args.length != 3) {
+            System.out.println("Usage: >> TestParser path-to-file className methodName");
+            return;
+        }
+
+        String path = args[0];
+        String className = args[1];
+        String methodName = args[2];
+
+        if(System.getProperty("os.name").startsWith("Windows")) {
+            path.replaceAll("/", "\\");
+        }
+
+        CompilationUnit cu = JavaParser.parse(new FileInputStream(new File(path)));
+        cu.accept(new MyVisitor(methodName), null);
+        ClassOrInterfaceDeclaration cls = cu.getClassByName(className).get();
         for (MethodDeclaration m : methods)
             cls.addMember(m);
 
         cls.setName("GeneratedTest");
-        FileWriter fw = new FileWriter(new File("./src/main/java/Sample1/GeneratedTest.java"));
+        FileWriter fw = new FileWriter(new File(path.replace(className, "GeneratedTest")));
         fw.append(cu.toString().replaceAll("ı", "i"));
         fw.flush();
         fw.close();

@@ -1,4 +1,4 @@
-package Sample2;
+package Samples.Sample2;
 
 import java.io.Serializable;
 
