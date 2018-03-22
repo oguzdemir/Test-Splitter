@@ -24,6 +24,7 @@ public class BankAccountTest {
         // test boundary -- default: each test assertion defines test boundary
         // another option: each public method invocation defines a test boundary
         // pre-state for next test -- save to file/read from file
+        account.withdrawMoney(100);
         assertTrue(account.owner.equals("SampleOwner") && account.accountId == 1001
                 && account.accountBalance == 499);
     }
