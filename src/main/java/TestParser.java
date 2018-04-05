@@ -176,7 +176,7 @@ public class TestParser {
         String methodName = args[2];
 
         if (System.getProperty("os.name").startsWith("Windows")) {
-            path.replaceAll("/", "\\");
+            path.replaceAll("/", "\\\\");
         }
 
         CompilationUnit cu = JavaParser.parse(new FileInputStream(new File(path)));
