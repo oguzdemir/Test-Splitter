@@ -1,16 +1,16 @@
-package Samples.Sample1;
+package Samples.Sample1x;
 
 import java.io.Serializable;
 
 /**
  * Created by od on 11/19/17.
  */
-public class SingleLinkedList {
+public class SingleLinkedList implements Serializable {
 
     Node header;
     int size;
 
-    static class Node {
+    static class Node implements Serializable {
 
         Node next;
         int elem;
