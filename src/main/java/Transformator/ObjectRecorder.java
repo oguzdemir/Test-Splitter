@@ -1,8 +1,9 @@
 package Transformator;
 
+import com.thoughtworks.xstream.XStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -12,19 +13,19 @@ import java.io.ObjectOutputStream;
  */
 public class ObjectRecorder {
 
-    private static FileOutputStream fileOutputStream;
+    private static XStream xstream = new XStream();
     private static ObjectOutputStream out;
     private static int writeIndex = 1;
 
-    private static FileInputStream fileInputStream;
     private static ObjectInputStream in;
     private static int readIndex = 0;
 
-    public static void writeObject(Object object)  {
+    public static void writeObject(Object object) {
         try {
-            if(out == null) {
-                fileOutputStream = new FileOutputStream(new File("out" + writeIndex));
-                out = new ObjectOutputStream(fileOutputStream);
+
+            if (out == null) {
+                out = xstream
+                    .createObjectOutputStream(new FileWriter(new File("out" + writeIndex)));
             }
 
             out.writeObject(object);
@@ -37,10 +38,7 @@ public class ObjectRecorder {
         try {
             out.flush();
             out.close();
-            fileOutputStream.flush();
-            fileOutputStream.close();
             out = null;
-            fileOutputStream = null;
             writeIndex++;
         } catch (IOException e) {
             e.printStackTrace();
@@ -50,9 +48,15 @@ public class ObjectRecorder {
     public static Object readObject(int index, String objectName) {
         try {
             if (index != readIndex) {
+                if (in != null) {
+                    try {
+                        in.close();
+                    } catch (Exception e) {
+
+                    }
+                }
                 readIndex = index;
-                fileInputStream = new FileInputStream(new File("out" + index));
-                in = new ObjectInputStream(fileInputStream);
+                in = xstream.createObjectInputStream(new FileReader(new File("out" + index)));
             }
 
             return in.readObject();
