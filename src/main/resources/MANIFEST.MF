@@ -1,0 +1,6 @@
+Manifest-Version: 1.0
+Agent-Class: TestInstrumenter
+Can-Redefine-Classes: true
+Can-Retransform-Classes: true
+Premain-Class: TestInstrumenter
+Built-By: Oguz Demir <ogzdemr@gmail.com>
