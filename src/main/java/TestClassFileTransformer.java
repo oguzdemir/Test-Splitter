@@ -1,5 +1,8 @@
 import java.lang.instrument.ClassFileTransformer;
 import java.security.ProtectionDomain;
+import java.util.Arrays;
+import java.util.HashSet;
+
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -11,14 +14,19 @@ import org.objectweb.asm.Opcodes;
  */
 class TestMethodVisitor extends MethodVisitor {
 
+    private String methodName;
+    private String className;
+
     TestMethodVisitor(String methodName, MethodVisitor mv, String className,
                       String description) {
         super(Opcodes.ASM5, mv);
+        this.methodName = methodName;
+        this.className = className;
     }
 
     @Override
-    public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
-        super.visitMethodInsn(opcode, owner, name, desc, itf);
+    public void visitCode(){
+        System.out.println("Method: " + className + ":" + methodName );
     }
 }
 
@@ -49,13 +57,34 @@ class TestClassVisitor extends ClassVisitor {
 
 public class TestClassFileTransformer implements ClassFileTransformer {
 
+    private HashSet<String> packages;
+
     public TestClassFileTransformer() {
 
+    }
+
+    public TestClassFileTransformer(String... pckgs) {
+        packages = new HashSet<>(pckgs.length);
+        packages.addAll(Arrays.asList(pckgs));
     }
 
     public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
                             ProtectionDomain protectionDomain, byte[] classfileBuffer) {
 
+        if(packages != null) {
+            if(!packages.contains(className))
+                return null;
+        }
+        else {
+            if(className.startsWith("java/") || className.startsWith("javax/") || className.startsWith("org/junit/")
+                    || className.contains("sun/") || className.startsWith("org/apache/maven/surefire/")
+                    || className.startsWith("junit/") || className.startsWith("com/thoughtworks/xstream/")
+                    || className.startsWith("jdk/")) {
+                return null;
+            }
+        }
+
+        //System.out.println("Classname: " + className);
         ClassReader classReader = new ClassReader(classfileBuffer);
         ClassWriter classWriter = new ClassWriter(classReader,
                 /* ClassWriter.COMPUTE_FRAMES | */ClassWriter.COMPUTE_MAXS);
