@@ -19,6 +19,8 @@ public class BankAccount {
         accountBalance -= amount;
     }
 
-
+    public int getAccountBalance() {
+        return accountBalance;
+    }
 
 }

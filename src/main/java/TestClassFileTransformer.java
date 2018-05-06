@@ -26,7 +26,10 @@ class TestMethodVisitor extends MethodVisitor {
 
     @Override
     public void visitCode(){
-        System.out.println("Method: " + className + ":" + methodName );
+        mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
+        mv.visitLdcInsn(className + " " +methodName);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+        //System.out.println("Method: " + className + ":" + methodName );
     }
 }
 
@@ -79,7 +82,7 @@ public class TestClassFileTransformer implements ClassFileTransformer {
             if(className.startsWith("java/") || className.startsWith("javax/") || className.startsWith("org/junit/")
                     || className.contains("sun/") || className.startsWith("org/apache/maven/surefire/")
                     || className.startsWith("junit/") || className.startsWith("com/thoughtworks/xstream/")
-                    || className.startsWith("jdk/")) {
+                    || className.startsWith("jdk/") || className.startsWith("com/intellij/")) {
                 return null;
             }
         }
