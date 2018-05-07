@@ -745,6 +745,9 @@
 					<failIfNoTests>false</failIfNoTests>
 					<trimStackTrace>false</trimStackTrace>
 					<redirectTestOutputToFile>true</redirectTestOutputToFile>
+					<argLine>
+                        -Xmx8196m -Xms1024m
+                    </argLine>
 					<excludes>
 						<exclude>**/*TestCase.java</exclude>
 					</excludes>

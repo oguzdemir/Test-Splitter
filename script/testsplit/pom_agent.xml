@@ -746,8 +746,8 @@
 					<trimStackTrace>false</trimStackTrace>
 					<redirectTestOutputToFile>true</redirectTestOutputToFile>
 					<argLine>
-      					-javaagent:/Users/od/Test-Splitter/target/Test-Splitter-1.0-SNAPSHOT-jar-with-dependencies.jar
-					</argLine>
+                        -Xmx8196m -Xms1024m -javaagent:/Users/od/Test-Splitter/target/Test-Splitter-1.0-SNAPSHOT-jar-with-dependencies.jar
+                    </argLine>
 					<excludes>
 						<exclude>**/*TestCase.java</exclude>
 					</excludes>
