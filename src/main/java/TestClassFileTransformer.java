@@ -26,9 +26,8 @@ class TestMethodVisitor extends MethodVisitor {
 
     @Override
     public void visitCode() {
-        mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
-        mv.visitLdcInsn(className + " " + methodName);
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println",
+        mv.visitLdcInsn(className + "#" + methodName);
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "TestMonitor", "visitMethod",
             "(Ljava/lang/String;)V", false);
         //System.out.println("Method: " + className + ":" + methodName );
     }
