@@ -76,11 +76,11 @@ def main():
 
     run_test(file_out, None, POM_DEFAULT_FILE, "default")
     print "Step 1"
-    run_test(file_out, SHA_FILE_OUT, POM_AGENT_FILE, "agent_file")
+    run_test(file_out, SHA_NO_OUT, POM_AGENT_FILE, "agent_none")
     print "Step 2"
     run_test(file_out, SHA_STD_OUT, POM_AGENT_FILE, "agent_std")
     print "Step 3"
-    run_test(file_out, SHA_NO_OUT, POM_AGENT_FILE, "agent_none")
+    run_test(file_out, SHA_FILE_OUT, POM_AGENT_FILE, "agent_file")
     print "Step 4"
     with open('csv2.csv', 'wb') as f:
         fields = file_out.values()[0].keys()
