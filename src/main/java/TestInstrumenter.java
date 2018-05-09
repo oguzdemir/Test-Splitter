@@ -7,14 +7,13 @@ public class TestInstrumenter {
      * Name of the Agent
      */
     private static Instrumentation sInstrumentation;
-
     public static void premain(String options, Instrumentation instrumentation) {
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
                 TestMonitor.finalizeWriting();
             }
         });
-
+        TestMonitor.initialize();
         init(instrumentation);
 
     }

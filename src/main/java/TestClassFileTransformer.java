@@ -16,20 +16,33 @@ class TestMethodVisitor extends MethodVisitor {
 
     private String methodName;
     private String className;
+    private String description;
 
     TestMethodVisitor(String methodName, MethodVisitor mv, String className,
         String description) {
         super(Opcodes.ASM5, mv);
         this.methodName = methodName;
         this.className = className;
+        this.description = description;
     }
 
     @Override
     public void visitCode() {
-        mv.visitLdcInsn(className + "#" + methodName);
+        mv.visitLdcInsn(className + "#" + methodName + "#" + description );
         mv.visitMethodInsn(Opcodes.INVOKESTATIC, "TestMonitor", "visitMethod",
             "(Ljava/lang/String;)V", false);
-        //System.out.println("Method: " + className + ":" + methodName );
+        super.visitCode();
+    }
+
+    @Override
+    public void visitInsn(int opcode) {
+        //Method exits
+        if (opcode == Opcodes.IRETURN || opcode == Opcodes.FRETURN || opcode == Opcodes.ARETURN
+                || opcode == Opcodes.LRETURN || opcode == Opcodes.DRETURN || opcode == Opcodes.RETURN
+                || opcode == Opcodes.ATHROW ) {
+            mv.visitMethodInsn(Opcodes.INVOKESTATIC,"TestMonitor", "finalizeMethod", "()V",false);
+        }
+        super.visitInsn(opcode);
     }
 }
 
