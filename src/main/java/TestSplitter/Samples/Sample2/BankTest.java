@@ -1,4 +1,4 @@
-package Samples.Sample2;
+package TestSplitter.Samples.Sample2;
 
 import static org.junit.Assert.assertTrue;
 

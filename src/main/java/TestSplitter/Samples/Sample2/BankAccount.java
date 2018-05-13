@@ -1,11 +1,9 @@
-package Samples.Sample2x;
-
-import java.io.Serializable;
+package TestSplitter.Samples.Sample2;
 
 /**
  * Created by od on 25.02.2018.
  */
-public class BankAccount implements Serializable {
+public class BankAccount {
     public int accountId;
     public String owner;
     public int accountBalance;
@@ -19,6 +17,8 @@ public class BankAccount implements Serializable {
         accountBalance -= amount;
     }
 
-
+    public int getAccountBalance() {
+        return accountBalance;
+    }
 
 }

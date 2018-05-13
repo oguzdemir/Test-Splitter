@@ -1,6 +1,4 @@
-package Samples.Sample1;
-
-import java.io.Serializable;
+package TestSplitter.Samples.Sample1;
 
 /**
  * Created by od on 11/19/17.

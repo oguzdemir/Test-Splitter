@@ -1,3 +1,5 @@
+package TestSplitter;
+
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Modifier;
@@ -99,7 +101,7 @@ public class TestParser {
                             ClassOrInterfaceType type = JavaParser
                                 .parseClassOrInterfaceType(types.get(i));
 
-                            NameExpr clazz = new NameExpr("Transformator.ObjectRecorder");
+                            NameExpr clazz = new NameExpr("TestSplitter.Transformator.ObjectRecorder");
                             MethodCallExpr call = new MethodCallExpr(clazz, "readObject");
                             call.addArgument(new IntegerLiteralExpr(index));
                             call.addArgument(new StringLiteralExpr(var));
@@ -142,7 +144,7 @@ public class TestParser {
 
                         int ind = ((BlockStmt) ((ExpressionStmt) statement).getParentNode().get())
                             .getStatements().indexOf(statement);
-                        NameExpr clazz = new NameExpr("Transformator.ObjectRecorder");
+                        NameExpr clazz = new NameExpr("TestSplitter.Transformator.ObjectRecorder");
                         MethodCallExpr call = new MethodCallExpr(clazz, "finalizeWriting");
                         ((BlockStmt) ((ExpressionStmt) statement).getParentNode().get())
                             .addStatement(ind, call);
@@ -154,7 +156,7 @@ public class TestParser {
                         continue;
                     }
 
-                    NameExpr clazz = new NameExpr("Transformator.ObjectRecorder");
+                    NameExpr clazz = new NameExpr("TestSplitter.Transformator.ObjectRecorder");
                     MethodCallExpr call = new MethodCallExpr(clazz, "writeObject");
                     call.addArgument(s);
                     expressions.add(call);
@@ -167,7 +169,7 @@ public class TestParser {
     public static void main(String[] args) throws Exception {
 
         if (args.length != 3) {
-            System.out.println("Usage: >> TestParser path-to-file className methodName");
+            System.out.println("Usage: >> TestSplitter.TestParser path-to-file className methodName");
             return;
         }
 

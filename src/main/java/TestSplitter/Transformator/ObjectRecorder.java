@@ -1,4 +1,4 @@
-package Transformator;
+package TestSplitter.Transformator;
 
 import com.thoughtworks.xstream.XStream;
 import java.io.File;

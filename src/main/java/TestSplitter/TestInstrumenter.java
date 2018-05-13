@@ -1,4 +1,5 @@
-import java.io.IOException;
+package TestSplitter;
+
 import java.lang.instrument.Instrumentation;
 
 public class TestInstrumenter {
@@ -10,7 +11,7 @@ public class TestInstrumenter {
     public static void premain(String options, Instrumentation instrumentation) {
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
-                TestMonitor.finalizeWriting();
+                TestSplitter.TestMonitor.finalizeWriting();
             }
         });
         TestMonitor.initialize();

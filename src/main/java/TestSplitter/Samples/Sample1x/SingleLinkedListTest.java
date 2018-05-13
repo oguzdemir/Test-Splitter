@@ -1,8 +1,8 @@
-package Samples.Sample1x;
+package TestSplitter.Samples.Sample1x;
 
 import static org.junit.Assert.assertTrue;
 
-import Transformator.ObjectRecorder;
+import TestSplitter.Transformator.ObjectRecorder;
 import org.junit.Test;
 
 /**

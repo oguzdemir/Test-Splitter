@@ -1,6 +1,7 @@
+package TestSplitter;
+
 import java.lang.instrument.ClassFileTransformer;
 import java.security.ProtectionDomain;
-import java.util.Arrays;
 import java.util.HashSet;
 
 import org.objectweb.asm.ClassReader;
@@ -28,8 +29,9 @@ class TestMethodVisitor extends MethodVisitor {
 
     @Override
     public void visitCode() {
+        //System.out.println(className + "#" + methodName + "#" + description );
         mv.visitLdcInsn(className + "#" + methodName + "#" + description );
-        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "TestMonitor", "visitMethod",
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "TestSplitter/TestMonitor", "visitMethod",
             "(Ljava/lang/String;)V", false);
         super.visitCode();
     }
@@ -40,7 +42,7 @@ class TestMethodVisitor extends MethodVisitor {
         if (opcode == Opcodes.IRETURN || opcode == Opcodes.FRETURN || opcode == Opcodes.ARETURN
                 || opcode == Opcodes.LRETURN || opcode == Opcodes.DRETURN || opcode == Opcodes.RETURN
                 || opcode == Opcodes.ATHROW ) {
-            mv.visitMethodInsn(Opcodes.INVOKESTATIC,"TestMonitor", "finalizeMethod", "()V",false);
+            mv.visitMethodInsn(Opcodes.INVOKESTATIC,"TestSplitter/TestMonitor", "finalizeMethod", "()V",false);
         }
         super.visitInsn(opcode);
     }
@@ -89,9 +91,13 @@ public class TestClassFileTransformer implements ClassFileTransformer {
 //                return null;
 //            }
 
-        if (!className.startsWith("org/activiti")) {
+        if (!(className.startsWith("org/activiti") || className.startsWith("java/io/ObjectOutputStream")
+            || className.startsWith("TestSplitter/") || className.startsWith("java/io/FileOutputStream"))) {
             return null;
         }
+
+        if(className.startsWith("TestSplitter/TestMonitor"))
+            return null;
 
         //System.out.println("Classname: " + className);
         ClassReader classReader = new ClassReader(classfileBuffer);

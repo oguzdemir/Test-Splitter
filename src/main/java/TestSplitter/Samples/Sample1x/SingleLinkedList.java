@@ -1,4 +1,4 @@
-package Samples.Sample1x;
+package TestSplitter.Samples.Sample1x;
 
 import java.io.Serializable;
 

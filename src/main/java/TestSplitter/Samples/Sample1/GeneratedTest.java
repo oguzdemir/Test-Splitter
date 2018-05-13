@@ -1,6 +1,6 @@
-package Samples.Sample1;
+package TestSplitter.Samples.Sample1;
 
-import Transformator.ObjectRecorder;
+import TestSplitter.Transformator.ObjectRecorder;
 import org.junit.Test;
 import static org.junit.Assert.assertTrue;
 
@@ -11,15 +11,15 @@ public class GeneratedTest {
         // system test given as input
         SingleLinkedList l = new SingleLinkedList();
         l.add(1);
-        Transformator.ObjectRecorder.writeObject(l);
-        Transformator.ObjectRecorder.finalizeWriting();
+        TestSplitter.Transformator.ObjectRecorder.writeObject(l);
+        TestSplitter.Transformator.ObjectRecorder.finalizeWriting();
         assertTrue(l.size == 1 && l.header.elem == 1 && l.header.next == null);
         // test boundary -- default: each test assertion defines test boundary
         // another option: each public method invocation defines a test boundary
         // pre-state for next test -- save to file/read from file
         l.add(0);
-        Transformator.ObjectRecorder.writeObject(l);
-        Transformator.ObjectRecorder.finalizeWriting();
+        TestSplitter.Transformator.ObjectRecorder.writeObject(l);
+        TestSplitter.Transformator.ObjectRecorder.finalizeWriting();
         assertTrue(l.size == 2 && l.header.elem == 0 && l.header.next.elem == 1 && l.header.next.next == null);
     }
 
@@ -49,7 +49,7 @@ public class GeneratedTest {
 
     @Test
     public void generatedU1() {
-        SingleLinkedList l = (SingleLinkedList) Transformator.ObjectRecorder.readObject(1, "l");
+        SingleLinkedList l = (SingleLinkedList) TestSplitter.Transformator.ObjectRecorder.readObject(1, "l");
         // pre-state for next test -- save to file/read from file
         l.add(0);
         assertTrue(l.size == 2 && l.header.elem == 0 && l.header.next.elem == 1 && l.header.next.next == null);
