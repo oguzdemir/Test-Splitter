@@ -2,6 +2,8 @@
 
 This project aims to split complex JUnit tests into parts for various purposes. 
 
+[Current Status Report](status.pdf)
+
 ## How to Run
 
 Project includes a main class to provide the functionality. The generated test file should be executed once before 
