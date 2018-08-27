@@ -10,7 +10,7 @@ Project includes a main class to provide the functionality. The generated test f
 executing the generated methods. 
 
 ``` Shell
-mvn compile exec:java -Dexec.mainClass="TestParser" -Dexec.args="path-to-file JUnitClassName MethodName"
+mvn compile exec:java -Dexec.mainClass="org.od.TestSplitter.TestParser" -Dexec.args="path-to-file JUnitClassName MethodName"
 ```
 
 _Path should be given in Unix style in all platforms_
@@ -23,7 +23,7 @@ __To run the the examples, first run the program to instrument the code.__
 
 __1. SingleLinkedList Example__
 ``` Shell
-mvn compile exec:java -Dexec.mainClass="TestParser" \
+mvn compile exec:java -Dexec.mainClass="org.od.TestSplitter.TestParser" \
    -Dexec.args="./src/main/java/Samples/Sample1/SingleLinkedListTest.java SingleLinkedListTest testS0"
 ```
 
@@ -41,7 +41,7 @@ mvn -Dtest=Samples.Sample1.GeneratedTest#generatedU1 test
 
 __2. BankAccount Example__
 ``` Shell
-mvn compile exec:java -Dexec.mainClass="TestParser" \
+mvn compile exec:java -Dexec.mainClass="org.od.TestSplitter.TestParser" \
    -Dexec.args="./src/main/java/Samples/Sample2/BankAccountTest.java BankAccountTest testS0"
 ```
 
