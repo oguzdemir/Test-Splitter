@@ -6,55 +6,45 @@ This project aims to split complex JUnit tests into parts for various purposes.
 
 ## How to Run
 
-Project includes a main class to provide the functionality. The generated test file should be executed once before 
-executing the generated methods. 
+
+| Option                  	| Functionality                                                                                                      	|
+|-------------------------	|--------------------------------------------------------------------------------------------------------------------	|
+| -p                      	| Path to test file                                                                                                  	|
+| -c (optional)           	| Target class name that includes the methods to be splitted. All the test class files will be processed by default. 	|
+| -t (optional, repeated) 	| Target method name(s) to split. All methods with (@Test) annotation will be processed by default.                  	|
+| -s (optional, repeated) 	| Split points (method names). All method calls in the test function will be considered as split point.              	|
+| -a                      	| Enabling splitting in assertions rather than method calls.                                                         	|                                                        |
+
+
 
 ``` Shell
-mvn compile exec:java -Dexec.mainClass="org.od.TestSplitter.TestParser" -Dexec.args="path-to-file JUnitClassName MethodName"
+mvn compile exec:java -Dexec.mainClass="org.od.TestSplitter.TestParser" -Dexec.args="<arguments>"
 ```
 
 _Path should be given in Unix style in all platforms_
 &nbsp;\
 &nbsp;
 
+__BankAccount Example__
 
-__To run the the examples, first run the program to instrument the code.__  
+_The original tests will be `@Before` function of the generated test class._
 
-
-__1. SingleLinkedList Example__
+* Splitting the test from specific methods
 ``` Shell
-mvn compile exec:java -Dexec.mainClass="org.od.TestSplitter.TestParser" \
-   -Dexec.args="./src/main/java/Samples/Sample1/SingleLinkedListTest.java SingleLinkedListTest testS0"
+ mvn compile exec:java -Dexec.mainClass="org.od.TestSplitter.TestParser" \
+     -Dexec.args="-p ./src/main/java/org/od/TestSplitter/Samples/ \
+     -c BankAccountTest -t testS0 -s withdrawMoney -s addMoney"
 ```
 
-* Run the instrumented test
+* Splitting the test from all assertions
 ``` Shell
-mvn -Dtest=Samples.Sample1.GeneratedTest#testS0 test
+ mvn compile exec:java -Dexec.mainClass="org.od.TestSplitter.TestParser" \
+     -Dexec.args="-p ./src/main/java/org/od/TestSplitter/Samples/ -c BankAccountTest -t testS0 -a"
 ```
 
-* You can verify the generated tests
+* Splitting the test from all methods
 ``` Shell
-mvn -Dtest=Samples.Sample1.GeneratedTest#generatedU0 test
-mvn -Dtest=Samples.Sample1.GeneratedTest#generatedU1 test
-```
-&nbsp;
-
-__2. BankAccount Example__
-``` Shell
-mvn compile exec:java -Dexec.mainClass="org.od.TestSplitter.TestParser" \
-   -Dexec.args="./src/main/java/Samples/Sample2/BankAccountTest.java BankAccountTest testS0"
-```
-
-
-
-* Run the instrumented test
-``` Shell
-mvn -Dtest=Samples.Sample2.GeneratedTest#testS0 test
-```
-
-* You can verify the generated tests
-``` Shell
-mvn -Dtest=Samples.Sample2.GeneratedTest#generatedU0 test
-mvn -Dtest=Samples.Sample2.GeneratedTest#generatedU1 test
+ mvn compile exec:java -Dexec.mainClass="org.od.TestSplitter.TestParser" \
+     -Dexec.args="-p ./src/main/java/org/od/TestSplitter/Samples/ -c BankAccountTest -t testS0"
 ```
 
