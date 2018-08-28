@@ -25,7 +25,7 @@ _Path should be given in Unix style in all platforms_
 &nbsp;\
 &nbsp;
 
-__BankAccount Example__
+__[BankAccount Example](./src/main/java/org/od/TestSplitter/Samples/BankAccountTest.java)__
 
 _The original tests will be `@Before` function of the generated test class._
 
