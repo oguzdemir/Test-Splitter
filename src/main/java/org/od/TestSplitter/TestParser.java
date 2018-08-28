@@ -100,7 +100,7 @@ public class TestParser {
             int addedStatements = 0;
             int index = 1;
             for (Integer i : splitIndexes) {
-                int ind = i + addedStatements;
+                int ind = i + addedStatements + 1;
 
                 NameExpr clazz = new NameExpr("org.od.TestSplitter.Transformator.ObjectRecorder");
                 MethodCallExpr call = new MethodCallExpr(clazz, "finalizeWriting");
@@ -167,9 +167,19 @@ public class TestParser {
                             split = true;
                         }
                         else {
-                            for (String spl : splitNames) {
-                                if (spl.contains(methodName)) {
-                                    split = true;
+                            if (i == statementArray.length - 1) {
+                                split = true;
+                            } else {
+                                String decidedSplit = null;
+                                for (String spl : splitNames) {
+                                    if (methodName.contains(spl)) {
+                                        decidedSplit = spl;
+                                        split = true;
+                                        break;
+                                    }
+                                }
+                                if (split) {
+                                    splitNames.remove(decidedSplit);
                                 }
                             }
                         }
@@ -309,9 +319,9 @@ public class TestParser {
         /**
          * Usage:
          * -p <Path to test source file>
-         * (optional) -c <Target class name>
+         * (optional) -c <Target class name> default: all classes are processed.
          * (optional, repeated) -t <Target method name>, default: all methods in the class are
-         *      processed.
+         *      processed. <Target class name> should be set.
          * (optional, repeated) -s <Split method name>, default: all method calls in the function
          *      level of the target method are considered as split point
          * -a : Enables splitting in assertions. Splitting by method name is disabled. If there is a
@@ -322,7 +332,8 @@ public class TestParser {
         Set<String> targetNames = new HashSet<>();
         Set<String> splitNames = new HashSet<>();
         TargetType targetType = TargetType.ALL_METHODS;
-        SplitType splitType = null;
+        SplitType splitType = SplitType.ALL_METHODS;
+        boolean record = false;
 
         for (int i = 0; i < args.length; i++) {
             String option = args[i];
@@ -351,7 +362,7 @@ public class TestParser {
                 case "-s":
                     validateOption("Point of split method should be specified after option -s",
                         nextArgument);
-                    targetNames.add(nextArgument);
+                    splitNames.add(nextArgument);
                     break;
                 case "-a":
                     i--;
@@ -361,14 +372,18 @@ public class TestParser {
                     throw new IllegalArgumentException("Option is not recognized: " + option);
             }
         }
+        if (classPath == null) {
+            throw new IllegalArgumentException("Path is not specified.");
+        }
+
+        if (classPath.charAt(classPath.length() -1) != '/') {
+            classPath = classPath + "/";
+        }
         if (System.getProperty("os.name").startsWith("Windows")) {
             classPath.replaceAll("/", "\\\\");
         }
 
-        ArrayList<String> allTestFiles = new ArrayList<>();
-        findAllFiles(allTestFiles, new File(classPath));
-
-        if (splitType == null) {
+        if (splitType != SplitType.ASSERTION) {
             if (splitNames.size() > 0) {
                 splitType = SplitType.METHOD_NAME;
             }
@@ -378,13 +393,18 @@ public class TestParser {
             targetType = TargetType.METHOD_NAME;
         }
 
-        if (classPath == null) {
-            throw new IllegalArgumentException("Path is not specified.");
+        ArrayList<String> allTestFiles = new ArrayList<>();
+        if (className == null) {
+            findAllFiles(allTestFiles, new File(classPath));
+        } else {
+            String fullPath = classPath + className + ".java";
+            File testFile = new File(fullPath);
+            if (testFile.exists() && !testFile.isDirectory()) {
+                allTestFiles.add(fullPath);
+            } else {
+                throw new IllegalArgumentException("Path: " + fullPath + " does not lead to a test class file.");
+            }
         }
-
-//        if (cls == null) {
-//            throw new IllegalArgumentException("Class name is not specified.");
-//        }
 
         ArrayList<String> existingClasses = new ArrayList<>();
         ArrayList<String> generatedClasses = new ArrayList<>();
@@ -410,25 +430,29 @@ public class TestParser {
                 cls.addMember(m);
             }
             String newName = className + "Generated" + testCount + "Test";
-            existingClasses.add(className);
-            generatedClasses.add(newName);
             cls.setName(newName);
             FileWriter fw = new FileWriter(new File(path.replace(className, newName)));
             fw.append(cu.toString().replaceAll("ı", "i"));
             fw.flush();
             fw.close();
-        }
 
-        FileWriter fileWriter = new FileWriter("existingTests.txt");
-        for (String s: existingClasses) {
-            fileWriter.append(s + "\n");
+            if (record) {
+                existingClasses.add(className);
+                generatedClasses.add(newName);
+            }
         }
-        fileWriter.close();
-        fileWriter = new FileWriter("generatedTests.txt");
-        for (String s: generatedClasses) {
-            fileWriter.append(s + "\n");
+        if (record) {
+            FileWriter fileWriter = new FileWriter("existingTests.txt");
+            for (String s : existingClasses) {
+                fileWriter.append(s + "\n");
+            }
+            fileWriter.close();
+            fileWriter = new FileWriter("generatedTests.txt");
+            for (String s : generatedClasses) {
+                fileWriter.append(s + "\n");
+            }
+            fileWriter.close();
         }
-        fileWriter.close();
 
     }
 }
