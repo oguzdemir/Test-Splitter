@@ -361,6 +361,10 @@ public class TestParser {
                     throw new IllegalArgumentException("Option is not recognized: " + option);
             }
         }
+        if (System.getProperty("os.name").startsWith("Windows")) {
+            classPath.replaceAll("/", "\\\\");
+        }
+
         ArrayList<String> allTestFiles = new ArrayList<>();
         findAllFiles(allTestFiles, new File(classPath));
 
@@ -382,10 +386,8 @@ public class TestParser {
 //            throw new IllegalArgumentException("Class name is not specified.");
 //        }
 
-        if (System.getProperty("os.name").startsWith("Windows")) {
-            classPath.replaceAll("/", "\\\\");
-        }
-
+        ArrayList<String> existingClasses = new ArrayList<>();
+        ArrayList<String> generatedClasses = new ArrayList<>();
         for (String path : allTestFiles) {
             methods = new ArrayList<>();
             boolFlags = new ArrayList<>();
@@ -393,9 +395,10 @@ public class TestParser {
 
             CompilationUnit cu = JavaParser.parse(new FileInputStream(new File(path)));
             className = path.substring(path.lastIndexOf("/") + 1, path.lastIndexOf("."));
+            if (System.getProperty("os.name").startsWith("Windows")) {
+                className = path.substring(path.lastIndexOf("\\") + 1, path.lastIndexOf("."));
+            }
 
-            if (!className.equals("CombinedRangeCategoryPlotTest"))
-                continue;
             cu.addImport("org.junit.Before");
             ClassOrInterfaceDeclaration cls = cu.getClassByName(className).get();
             cu.accept(new MyVisitor(cls,targetNames, splitNames, targetType, splitType), null);
@@ -407,11 +410,25 @@ public class TestParser {
                 cls.addMember(m);
             }
             String newName = className + "Generated" + testCount + "Test";
+            existingClasses.add(className);
+            generatedClasses.add(newName);
             cls.setName(newName);
             FileWriter fw = new FileWriter(new File(path.replace(className, newName)));
             fw.append(cu.toString().replaceAll("ı", "i"));
             fw.flush();
             fw.close();
         }
+
+        FileWriter fileWriter = new FileWriter("existingTests.txt");
+        for (String s: existingClasses) {
+            fileWriter.append(s + "\n");
+        }
+        fileWriter.close();
+        fileWriter = new FileWriter("generatedTests.txt");
+        for (String s: generatedClasses) {
+            fileWriter.append(s + "\n");
+        }
+        fileWriter.close();
+
     }
 }
