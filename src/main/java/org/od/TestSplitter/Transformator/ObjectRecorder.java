@@ -37,7 +37,7 @@ public class ObjectRecorder {
 
     public static void finalizeWriting() {
         try {
-            xstream.toXML(writtenObjects,  new FileWriter(new File("out_" + methodName + "_" + writeIndex + ".xml")));
+            xstream.toXML(writtenObjects,  new FileWriter(new File("./snapshots/out_" + methodName + "_" + writeIndex + ".xml")));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -47,7 +47,7 @@ public class ObjectRecorder {
         try {
             if (index != readIndex) {
                 readObjectIndex = 0;
-                readObjects = (ArrayList) xstream.fromXML(new File("out_" + methodName + "_" + index + ".xml"));
+                readObjects = (ArrayList) xstream.fromXML(new File("./snapshots/out_" + methodName + "_" + index + ".xml"));
                 readIndex = index;
             }
         } catch (Exception e) {
