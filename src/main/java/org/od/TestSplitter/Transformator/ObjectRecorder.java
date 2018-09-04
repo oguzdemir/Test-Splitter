@@ -8,6 +8,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.ArrayList;
+import java.util.Scanner;
 
 /**
  * Created by od on 25.02.2018.
@@ -15,71 +17,44 @@ import java.io.ObjectOutputStream;
 public class ObjectRecorder {
 
     private static XStream xstream = new XStream();
-    private static ObjectOutputStream out;
 
-    private static ObjectInputStream in;
     private static int readIndex = 0;
+    private static ArrayList<Object> writtenObjects;
+    private static int writeIndex;
+    private static String methodName;
+    private static ArrayList<Object> readObjects;
+    private static int readObjectIndex;
 
     public static void writeObject(String methodName, Object object, int writeIndex) {
-        try {
-
-            if (out == null) {
-                out = xstream
-                    .createObjectOutputStream(new FileWriter(new File("out_" + methodName + "_" + writeIndex + ".xml")));
-            }
-
-            out.writeObject(object);
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (writtenObjects == null) {
+            ObjectRecorder.methodName = methodName;
+            ObjectRecorder.writeIndex = writeIndex;
+            writtenObjects = new ArrayList<>();
         }
+
+        writtenObjects.add(object);
     }
 
     public static void finalizeWriting() {
         try {
-            out.flush();
-            out.close();
-            out = null;
+            xstream.toXML(writtenObjects,  new FileWriter(new File("out_" + methodName + "_" + writeIndex + ".xml")));
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
     public static Object readObject(String methodName, int index) {
-        int prevIndex = -1;
         try {
             if (index != readIndex) {
-                if (in != null) {
-                    try {
-                        in.close();
-                    } catch (Exception e) {
-
-                    }
-                }
-                prevIndex = readIndex;
+                readObjectIndex = 0;
+                readObjects = (ArrayList) xstream.fromXML(new File("out_" + methodName + "_" + index + ".xml"));
                 readIndex = index;
-                in = xstream.createObjectInputStream(new FileReader(new File("out_" + methodName + "_" + index + ".xml")));
             }
         } catch (Exception e) {
             System.err.println("File cannot be opened.");
             return null;
         }
-        try {
-            return in.readObject();
-        } catch (EOFException e) {
-            return readObjectTryAgain(methodName, index);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
+        return readObjects.get(readObjectIndex++);
     }
 
-    public static Object readObjectTryAgain(String methodName, int index) {
-        try {
-            Thread.sleep(10);
-            in = xstream.createObjectInputStream(new FileReader(new File("out_" + methodName + "_" + index + ".xml")));
-            return in.readObject();
-        } catch (Exception e) {
-            return null;
-        }
-    }
 }
