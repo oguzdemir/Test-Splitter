@@ -5,21 +5,12 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Modifier;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.comments.LineComment;
-import com.github.javaparser.ast.expr.AssignExpr;
-import com.github.javaparser.ast.expr.BooleanLiteralExpr;
-import com.github.javaparser.ast.expr.CastExpr;
-import com.github.javaparser.ast.expr.IntegerLiteralExpr;
-import com.github.javaparser.ast.expr.MarkerAnnotationExpr;
-import com.github.javaparser.ast.expr.MethodCallExpr;
-import com.github.javaparser.ast.expr.Name;
-import com.github.javaparser.ast.expr.NameExpr;
-import com.github.javaparser.ast.expr.StringLiteralExpr;
-import com.github.javaparser.ast.expr.UnaryExpr;
+import com.github.javaparser.ast.expr.*;
 import com.github.javaparser.ast.expr.UnaryExpr.Operator;
-import com.github.javaparser.ast.expr.VariableDeclarationExpr;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ExpressionStmt;
 import com.github.javaparser.ast.stmt.IfStmt;
@@ -29,15 +20,12 @@ import com.github.javaparser.ast.type.ReferenceType;
 import com.github.javaparser.ast.type.Type;
 import com.github.javaparser.ast.type.VoidType;
 import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
+
+import javax.swing.plaf.nimbus.State;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * This file extracts the statements for variable declarations and assertions in the test source via
@@ -49,8 +37,7 @@ import java.util.Set;
 public class TestParser {
 
     static ArrayList<MethodDeclaration> methods;
-    static ArrayList<String> boolFlags;
-    static int testCount = 0;
+    static int testCount = 1;
 
     enum TargetType {
         ALL_METHODS, METHOD_NAME
@@ -67,6 +54,7 @@ public class TestParser {
         TargetType targetType;
         SplitType splitType;
         ClassOrInterfaceDeclaration cls;
+        Map<String, String> fieldMap;
 
         public MyVisitor(ClassOrInterfaceDeclaration cls, Set<String> targetNames, Set<String> splitNames, TargetType targetType,
             SplitType splitType) {
@@ -75,10 +63,37 @@ public class TestParser {
             this.splitNames = splitNames;
             this.targetType = targetType;
             this.splitType = splitType;
+            this.fieldMap = extractFieldMap(cls);
         }
 
+        /**
+         * Constructs a fieldMap for the field variables of the test class. (fieldName -> fieldType)
+         * @param cls classDeclaration to be processed.
+         * @return map of class fields with values of types.
+         */
+        Map<String, String> extractFieldMap(ClassOrInterfaceDeclaration cls) {
+            HashMap<String, String> fieldMap = new HashMap<>();
 
-        VariableDeclarationExpr toReadExpr(String methodName, String typeName, int index, String var) {
+            for (FieldDeclaration fieldDeclaration: cls.getFields()) {
+                for (VariableDeclarator variableDeclarator: fieldDeclaration.getVariables()) {
+                    fieldMap.put(variableDeclarator.getNameAsString(), variableDeclarator.getType().toString());
+                }
+            }
+
+            return fieldMap;
+        }
+        /**
+         * Creates a read expression to recover the state of a variable or state
+         *
+         * @param methodName The method which is being processed. The read statement will go the this method.
+         * @param variableName Name of the variable.
+         * @param typeName Type of the recovered variable field.
+         * @param index Index of the splitted method, this index is used for finding the correct recorded file.
+         * @param isThis Flag for differentiate fields and variables. If isThis = true; the resulting read statement
+         *               will be `this.fieldName = readExpr`;
+         * @return Corresponding read expression
+         */
+        Expression toReadExpr(String methodName, String variableName, String typeName, int index, boolean isThis) {
             Type type = JavaParser.parseType(typeName);
             Type castType = type;
             if (type.isPrimitiveType()) {
@@ -89,208 +104,202 @@ public class TestParser {
             call.addArgument(new StringLiteralExpr(methodName));
             call.addArgument(new IntegerLiteralExpr(index));
             CastExpr castExpr = new CastExpr(castType, call);
-            VariableDeclarator declarator = new VariableDeclarator(type, var,
-                castExpr);
-            return new VariableDeclarationExpr(declarator);
-        }
-
-        void addWriteStatements(String methodName, BlockStmt methodBlock, ArrayList<Integer> splitIndexes,
-            ArrayList<String> variables) {
-
-            int addedStatements = 0;
-            int index = 1;
-            for (Integer i : splitIndexes) {
-                int ind = i + addedStatements + 1;
-
-                NameExpr clazz = new NameExpr("org.od.TestSplitter.Transformator.ObjectRecorder");
-                MethodCallExpr call = new MethodCallExpr(clazz, "finalizeWriting");
-                methodBlock.addStatement(ind, call);
-                addedStatements++;
-                for (String variable : variables) {
-                    if (variable.equals("%")) {
-                        break;
-                    }
-                    NameExpr objectClazz = new NameExpr(
-                        "org.od.TestSplitter.Transformator.ObjectRecorder");
-                    MethodCallExpr writeCall = new MethodCallExpr(objectClazz, "writeObject");
-                    writeCall.addArgument(new StringLiteralExpr(methodName));
-                    writeCall.addArgument(variable);
-                    writeCall.addArgument(new IntegerLiteralExpr(index));
-                    methodBlock.addStatement(ind, writeCall);
-                    addedStatements++;
-                }
-                variables.remove("%");
-                index++;
+            if (isThis) {
+                FieldAccessExpr fieldAccessExpr = new FieldAccessExpr(new ThisExpr(), variableName);
+                return new AssignExpr(fieldAccessExpr, castExpr, AssignExpr.Operator.ASSIGN);
+            } else {
+                VariableDeclarator declarator = new VariableDeclarator(type, variableName,
+                        castExpr);
+                return new VariableDeclarationExpr(declarator);
             }
         }
 
-        Map<String, Object> parseBody(NodeList<Statement> statements) {
-            Map<String, Object> resultMap = new HashMap<>();
-            ArrayList<String> recordedVariables = new ArrayList<>();
-            ArrayList<String> recordedTypes = new ArrayList<>();
-            ArrayList<Integer> splitIndexes = new ArrayList<>();
+        Expression toWriteExpr(String methodName, String variable, int index, boolean isThis) {
+            NameExpr objectRecorderClass = new NameExpr(
+                    "org.od.TestSplitter.Transformator.ObjectRecorder");
+            MethodCallExpr writeCallExpr = new MethodCallExpr(objectRecorderClass, "writeObject");
+            writeCallExpr.addArgument(new StringLiteralExpr(methodName));
+            if (isThis) {
+                writeCallExpr.addArgument(new FieldAccessExpr(new ThisExpr(), variable));
+            } else {
+                writeCallExpr.addArgument(variable);
+            }
+            writeCallExpr.addArgument(new IntegerLiteralExpr(index));
 
-            resultMap.put("recordedVariables", recordedVariables);
-            resultMap.put("recordedTypes", recordedTypes);
-            resultMap.put("splitIndexes", splitIndexes);
+            return writeCallExpr;
+        }
 
-            //Collect variable declarations and assert statements
-            Object[] statementArray = statements.toArray();
-            for (int i = 0; i < statementArray.length; i++) {
-                Statement statement = (Statement) statementArray[i];
-                if (statement instanceof ExpressionStmt &&
-                    ((ExpressionStmt) statement)
-                        .getExpression() instanceof VariableDeclarationExpr) {
-                    VariableDeclarationExpr stmt = (VariableDeclarationExpr) (((ExpressionStmt) statement)
-                        .getExpression());
-                    for (VariableDeclarator declarator : stmt.getVariables()) {
-                        recordedVariables.add(declarator.getName().toString());
-                        recordedTypes.add(declarator.getType().toString());
+        void addWriteStatements(MethodDeclaration method, Map<String, String> variableMap, int splitIndex, int statementIndex) {
+            String methodName = method.getNameAsString();
+            BlockStmt methodBlock = method.getBody().get();
+
+            NameExpr clazz = new NameExpr("org.od.TestSplitter.Transformator.ObjectRecorder");
+            MethodCallExpr call = new MethodCallExpr(clazz, "finalizeWriting");
+            methodBlock.addStatement(statementIndex, call);
+
+            for (Map.Entry<String, String> splitInfo : variableMap.entrySet()) {
+                String variableName = splitInfo.getKey();
+                Expression writeExpr = toWriteExpr(method.getNameAsString(),variableName, splitIndex, false);
+                methodBlock.addStatement(statementIndex, writeExpr);
+            }
+
+            for (Map.Entry<String, String> fieldInfo : fieldMap.entrySet()) {
+                String variableName = fieldInfo.getKey();
+                Expression writeExpr = toWriteExpr(method.getNameAsString(),variableName, splitIndex, false);
+                methodBlock.addStatement(statementIndex, writeExpr);
+            }
+        }
+
+        boolean isSplitStatement(Object[] statementArray, int index) {
+            Statement statement = (Statement) statementArray[index];
+            boolean split = false;
+            // Split point
+            if (statement instanceof ExpressionStmt &&
+                    ((ExpressionStmt) statement).getExpression() instanceof MethodCallExpr) {
+                String methodName = statement.toString();
+                if (methodName.startsWith("assert") && splitType == SplitType.ASSERTION) {
+                    if (index + 1 >= statementArray.length) {
+                        split = true;
+                    }
+                    else if (!statementArray[index + 1].toString().startsWith("assert")) {
+                        split = true;
                     }
                 }
-
-                boolean split = false;
-                // Split point
-                if (statement instanceof ExpressionStmt &&
-                    ((ExpressionStmt) statement).getExpression() instanceof MethodCallExpr) {
-                    String methodName = statement.toString();
-                    if (methodName.startsWith("assert") && splitType == SplitType.ASSERTION) {
-                        if (i + 1 >= statementArray.length) {
-                            split = true;
-                        }
-                        else if (!statementArray[i + 1].toString().startsWith("assert")) {
-                            split = true;
-                        }
+                else {
+                    if (splitType == SplitType.ALL_METHODS) {
+                        split = true;
                     }
                     else {
-                        if (splitType == SplitType.ALL_METHODS) {
+                        if (index == statementArray.length - 1) {
                             split = true;
-                        }
-                        else {
-                            if (i == statementArray.length - 1) {
-                                split = true;
-                            } else {
-                                String decidedSplit = null;
-                                for (String spl : splitNames) {
-                                    if (methodName.contains(spl)) {
-                                        decidedSplit = spl;
-                                        split = true;
-                                        break;
-                                    }
+                        } else {
+                            String decidedSplit = null;
+                            for (String spl : splitNames) {
+                                if (methodName.contains(spl)) {
+                                    decidedSplit = spl;
+                                    split = true;
+                                    break;
                                 }
-                                if (split) {
-                                    splitNames.remove(decidedSplit);
-                                }
+                            }
+                            if (split) {
+                                splitNames.remove(decidedSplit);
                             }
                         }
                     }
                 }
-                if (split && i > 0) {
-                    recordedVariables.add("%");
-                    recordedTypes.add("%");
-                    splitIndexes.add(i);
-                    statement.setComment(new LineComment("Split Point: " + splitIndexes.size()));
+            }
+            return split;
+        }
+
+        Map<Integer, Map<String, String>> parseMethodBody(NodeList<Statement> statements) {
+
+            Map<Integer, Map<String, String>> resultMap = new HashMap<>();
+            Map<String, String> splitInformation = new HashMap<>();
+
+            //Collect variable declarations and assert statements
+            Object[] statementArray = statements.toArray();
+            for (int statementIndex = 0; statementIndex < statementArray.length; statementIndex++) {
+                Statement statement = (Statement) statementArray[statementIndex];
+                if (statement instanceof ExpressionStmt &&
+                        ((ExpressionStmt) statement).getExpression() instanceof VariableDeclarationExpr) {
+                    VariableDeclarationExpr stmt = (VariableDeclarationExpr) (((ExpressionStmt) statement)
+                            .getExpression());
+                    for (VariableDeclarator declarator : stmt.getVariables()) {
+                        splitInformation.put(declarator.getNameAsString(), declarator.getType().toString());
+                    }
+                }
+
+                boolean split = isSplitStatement(statementArray, statementIndex);
+
+                if (split && statementIndex > 0) {
+                    Map<String, String> clonedMap = new HashMap<>(splitInformation);
+                    resultMap.put(statementIndex, clonedMap);
+                    statement.setComment(new LineComment("Split Point: " + clonedMap.size()));
                 }
             }
 
             return resultMap;
         }
 
+        boolean checkTargetMethod(MethodDeclaration method) {
+            boolean isGenerated = method.getName().toString().startsWith("generated");
+            boolean isTest =  method.getAnnotations().size() > 0 && method.getAnnotation(0).toString().equals("@Test");
+
+            return !isGenerated &&
+                    isTest &&
+                    (targetType == TargetType.ALL_METHODS || targetNames.contains(method.getName().toString()));
+        }
+
+        MethodDeclaration generateSplittedMethod(MethodDeclaration parentMethod, BlockStmt block, Map<String, String> variableMap, int index) {
+
+            if (variableMap != null) {
+                for (Map.Entry<String, String> splitInfo : variableMap.entrySet()) {
+                    String variableName = splitInfo.getKey();
+                    String variableType = splitInfo.getValue();
+                    Expression readExpr = toReadExpr(parentMethod.getNameAsString(), variableName, variableType, index, false);
+                    block.addStatement(0, readExpr);
+                }
+
+                for (Map.Entry<String, String> fieldInfo : fieldMap.entrySet()) {
+                    String variableName = fieldInfo.getKey();
+                    String variableType = fieldInfo.getValue();
+                    Expression readExpr = toReadExpr(parentMethod.getNameAsString(), variableName, variableType, index, true);
+                    block.addStatement(0, readExpr);
+                }
+            }
+
+            // create a methodDeclaration
+            EnumSet<Modifier> modifiers = EnumSet.of(Modifier.PUBLIC);
+            MethodDeclaration methodDeclaration = new MethodDeclaration(modifiers, new VoidType(),
+                    "generatedU" + testCount++);
+            methodDeclaration.addAnnotation(parentMethod.getAnnotation(0));
+            for (ReferenceType referenceType: parentMethod.getThrownExceptions()) {
+                methodDeclaration.addThrownException(referenceType);
+            }
+            methodDeclaration.setBody(block);
+
+            return methodDeclaration;
+        }
+
         @Override
-        public void visit(MethodDeclaration n, Object arg) {
+        public void visit(MethodDeclaration method, Object arg) {
+            if (checkTargetMethod(method)) {
+                Map<Integer, Map<String, String>> parsedBody = parseMethodBody(method.getBody().get().getStatements());
 
-            if ((!n.getName().toString().startsWith("generated")) && n.getAnnotations().size() > 0 &&
-                n.getAnnotation(0).toString().equals("@Test") &&
-                (
-                    targetType == TargetType.ALL_METHODS ||
-                    targetNames.contains(n.getName().toString()))) {
-                Map<String, Object> parsedBody = parseBody(n.getBody().get().getStatements());
-
-                ArrayList<String> recordedVariables = (ArrayList<String>) parsedBody
-                    .get("recordedVariables");
-                ArrayList<String> recordedTypes = (ArrayList<String>) parsedBody
-                    .get("recordedTypes");
-                ArrayList<Integer> splitIndexes = (ArrayList<Integer>) parsedBody
-                    .get("splitIndexes");
-
-                if (splitIndexes.size() <= 1) {
-                    super.visit(n, arg);
+                if (parsedBody.size() <= 1) {
+                    super.visit(method, arg);
                     return;
                 }
-                // Generating splitted methods.
-                recordedVariables.add(0, "%");
-                recordedTypes.add(0, "%");
 
                 BlockStmt block = new BlockStmt();
-                int index = 0;
-                Object[] statementArray = n.getBody().get().getStatements().toArray();
-                boolean beforeClass = false;
-                for (int statementIndex = 0; statementIndex < statementArray.length;
-                    statementIndex++) {
-                    Statement s = (Statement) statementArray[statementIndex];
-                    if (statementIndex == splitIndexes.get(index)) {
-                        int count = 0;
-                        for (int i = 0; i < recordedVariables.size(); i++) {
-                            String var = recordedVariables.get(i);
-                            if (var.equals("%")) {
-                                if (count == index) {
-                                    break;
-                                }
-                                count++;
-                                continue;
-                            }
-                            String typeName = recordedTypes.get(i);
-                            VariableDeclarationExpr variableDeclarationExpr = toReadExpr(n.getNameAsString(),typeName,
-                                index, var);
-                            block.addStatement(0, variableDeclarationExpr);
-                        }
+                int splitPointNumber = 0;
+                int previousSplitStatementIndex = 0;
+                int modifiedMethodStatementIndex = 0;
+                Object[] statementArray = method.getBody().get().getStatements().toArray();
 
-                        // create a method
-                        testCount++;
-                        EnumSet<Modifier> modifiers = EnumSet.of(Modifier.PUBLIC);
-                        MethodDeclaration method = new MethodDeclaration(modifiers, new VoidType(),
-                            "generatedU" + testCount);
-                        method.addAnnotation(n.getAnnotation(0));
-                        for (ReferenceType referenceType: n.getThrownExceptions()) {
-                            method.addThrownException(referenceType);
-                        }
-                        // add a body to the method
-                        block.addStatement(s.clone());
-                        method.setBody(block);
-                        methods.add(method);
-                        beforeClass = true;
+                for (int stmtInd = 0; stmtInd < statementArray.length; stmtInd++, modifiedMethodStatementIndex++) {
+                    Statement s = (Statement) statementArray[stmtInd];
+                    block.addStatement(s.clone());
+
+                    if (parsedBody.containsKey(stmtInd)) {
+                        MethodDeclaration methodDeclaration = generateSplittedMethod(method, block, parsedBody.get(previousSplitStatementIndex), splitPointNumber);
+
+                        methods.add(methodDeclaration);
                         block = new BlockStmt();
-                        index++;
+                        splitPointNumber++;
 
-                        if (index == splitIndexes.size()) {
+                        if (splitPointNumber == parsedBody.size()) {
                             break;
                         }
+                        addWriteStatements(method, parsedBody.get(stmtInd), splitPointNumber, modifiedMethodStatementIndex);
+                        modifiedMethodStatementIndex += parsedBody.get(stmtInd).size() + 1;
+
+                        previousSplitStatementIndex = stmtInd;
                     }
-                    else {
-                        block.addStatement(s.clone());
-                    }
+
                 }
-
-                // Inserting Writes to the actual source code.
-                recordedVariables.remove(0);
-                recordedTypes.remove(0);
-                if (beforeClass) {
-                    //n.addModifier(Modifier.STATIC);
-                    n.setAnnotation(0, new MarkerAnnotationExpr(new Name("Before")));
-                }
-                addWriteStatements(n.getNameAsString(), n.getBody().get(), splitIndexes, recordedVariables);
-
-                String boolFlag = "hasInit" + n.getNameAsString();
-                boolFlags.add(boolFlag);
-                BlockStmt blockStmt = n.getBody().get().clone();
-                blockStmt.addStatement(new AssignExpr(new NameExpr(boolFlag), new BooleanLiteralExpr(true), AssignExpr.Operator.ASSIGN ));
-                BlockStmt newBlockStmt = new BlockStmt();
-                IfStmt ifStmt = new IfStmt(new UnaryExpr(new NameExpr(boolFlag), Operator.LOGICAL_COMPLEMENT), blockStmt, null);
-                newBlockStmt.addStatement(ifStmt);
-
-                n.setBody(newBlockStmt);
             }
-            super.visit(n, arg);
+            super.visit(method, arg);
         }
     }
 
@@ -410,22 +419,16 @@ public class TestParser {
         ArrayList<String> generatedClasses = new ArrayList<>();
         for (String path : allTestFiles) {
             methods = new ArrayList<>();
-            boolFlags = new ArrayList<>();
-            testCount = 0;
+            testCount = 1;
 
             CompilationUnit cu = JavaParser.parse(new FileInputStream(new File(path)));
             className = path.substring(path.lastIndexOf("/") + 1, path.lastIndexOf("."));
-            if (System.getProperty("os.name").startsWith("Windows")) {
-                className = path.substring(path.lastIndexOf("\\") + 1, path.lastIndexOf("."));
-            }
 
             cu.addImport("org.junit.Before");
             ClassOrInterfaceDeclaration cls = cu.getClassByName(className).get();
             cu.accept(new MyVisitor(cls,targetNames, splitNames, targetType, splitType), null);
 
-            for (String flag: boolFlags) {
-                cls.addFieldWithInitializer(PrimitiveType.booleanType(), flag, new BooleanLiteralExpr(false), Modifier.PRIVATE);
-            }
+
             for (MethodDeclaration m : methods) {
                 cls.addMember(m);
             }
