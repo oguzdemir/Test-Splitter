@@ -35,7 +35,6 @@ public class TestParser {
 
     static ArrayList<MethodDeclaration> methods;
     static ArrayList<MethodDeclaration> befores;
-    static ArrayList<MethodDeclaration> afters;
     static int testCount = 1;
 
     enum TargetType {
@@ -44,6 +43,15 @@ public class TestParser {
 
     enum SplitType {
         ASSERTION, ALL_METHODS, METHOD_NAME
+    }
+
+    static class BeforeMethodsExtractor extends VoidVisitorAdapter<Object> {
+        @Override
+        public void visit(MethodDeclaration method, Object arg) {
+            if (method.getAnnotations().size() > 0 && method.getAnnotation(0).toString().equals("@Before")) {
+                befores.add(method);
+            }
+        }
     }
 
     static class MethodVisitorForSplit extends VoidVisitorAdapter<Object> {
@@ -67,11 +75,22 @@ public class TestParser {
 
         @Override
         public void visit(MethodDeclaration method, Object arg) {
-
+            if (!method.getParentNode().get().equals(cls)) {
+                return;
+            }
             if (checkTargetMethod(method)) {
                 Map<Integer, Map<String, String>> parsedBody = parseMethodBody(method.getBody().get().getStatements());
 
                 if (parsedBody.size() <= 1) {
+                    MethodDeclaration originalMethod = method.clone();
+                    BlockStmt originalBlock = originalMethod.getBody().get();
+
+                    for (MethodDeclaration beforeMethod: befores) {
+                        for (Statement statement: beforeMethod.getBody().get().getStatements()) {
+                            originalBlock.addStatement(0, statement);
+                        }
+                    }
+                    methods.add(originalMethod);
                     super.visit(method, arg);
                     return;
                 }
@@ -103,7 +122,11 @@ public class TestParser {
                     }
 
                 }
+            } else if (!(method.getAnnotations().size() > 0 && method.getAnnotation(0).toString().equals("@Before"))) {
+                // Preserve the method if it is not annotated "Before"
+                methods.add(method);
             }
+
             super.visit(method, arg);
         }
 
@@ -126,7 +149,7 @@ public class TestParser {
         /**
          * Creates a read expression to recover the state of a variable or state
          *
-         * @param methodName The method which is being processed. The read statement will go the this method.
+         * @param classAndMethodName The method which is being processed. The read statement will go the this method.
          * @param variableName Name of the variable.
          * @param typeName Type of the recovered variable field.
          * @param index Index of the splitted method, this index is used for finding the correct recorded file.
@@ -134,7 +157,7 @@ public class TestParser {
          *               will be `this.fieldName = readExpr`;
          * @return Corresponding read expression
          */
-        Expression toReadExpr(String methodName, String variableName, String typeName, int index, boolean isThis) {
+        Expression toReadExpr(String classAndMethodName, String variableName, String typeName, int index, boolean isThis) {
             Type type = JavaParser.parseType(typeName);
             Type castType = type;
             if (type.isPrimitiveType()) {
@@ -142,7 +165,7 @@ public class TestParser {
             }
             NameExpr clazz = new NameExpr("org.od.TestSplitter.Transformator.ObjectRecorder");
             MethodCallExpr call = new MethodCallExpr(clazz, "readObject");
-            call.addArgument(new StringLiteralExpr(methodName));
+            call.addArgument(new StringLiteralExpr(classAndMethodName));
             call.addArgument(new IntegerLiteralExpr(index));
             CastExpr castExpr = new CastExpr(castType, call);
             if (isThis) {
@@ -155,11 +178,11 @@ public class TestParser {
             }
         }
 
-        Expression toWriteExpr(String methodName, String variable, int index, boolean isThis) {
+        Expression toWriteExpr(String classAndMethodName, String variable, int index, boolean isThis) {
             NameExpr objectRecorderClass = new NameExpr(
                     "org.od.TestSplitter.Transformator.ObjectRecorder");
             MethodCallExpr writeCallExpr = new MethodCallExpr(objectRecorderClass, "writeObject");
-            writeCallExpr.addArgument(new StringLiteralExpr(methodName));
+            writeCallExpr.addArgument(new StringLiteralExpr(classAndMethodName));
             if (isThis) {
                 writeCallExpr.addArgument(new FieldAccessExpr(new ThisExpr(), variable));
             } else {
@@ -171,22 +194,23 @@ public class TestParser {
         }
 
         void addWriteStatements(MethodDeclaration method, Map<String, String> variableMap, int splitIndex, int statementIndex) {
-            String methodName = method.getNameAsString();
             BlockStmt methodBlock = method.getBody().get();
+
+            methodBlock.getStatement(statementIndex).setComment(new LineComment("Split Point: " + splitIndex));
 
             NameExpr clazz = new NameExpr("org.od.TestSplitter.Transformator.ObjectRecorder");
             MethodCallExpr call = new MethodCallExpr(clazz, "finalizeWriting");
             methodBlock.addStatement(statementIndex, call);
 
+            String classAndMethodName = cls.getNameAsString() + "_" + method.getNameAsString();
             for (Map.Entry<String, String> splitInfo : variableMap.entrySet()) {
                 String variableName = splitInfo.getKey();
-                Expression writeExpr = toWriteExpr(method.getNameAsString(),variableName, splitIndex, false);
+                Expression writeExpr = toWriteExpr(classAndMethodName,variableName, splitIndex, false);
                 methodBlock.addStatement(statementIndex, writeExpr);
             }
-
             for (Map.Entry<String, String> fieldInfo : fieldMap.entrySet()) {
                 String variableName = fieldInfo.getKey();
-                Expression writeExpr = toWriteExpr(method.getNameAsString(),variableName, splitIndex, false);
+                Expression writeExpr = toWriteExpr(classAndMethodName,variableName, splitIndex, false);
                 methodBlock.addStatement(statementIndex, writeExpr);
             }
         }
@@ -255,7 +279,7 @@ public class TestParser {
                 if (split && statementIndex > 0) {
                     Map<String, String> clonedMap = new HashMap<>(splitInformation);
                     resultMap.put(statementIndex, clonedMap);
-                    statement.setComment(new LineComment("Split Point: " + clonedMap.size()));
+                    //statement.setComment(new LineComment("Split Point: " + resultMap.size()));
                 }
             }
 
@@ -272,19 +296,26 @@ public class TestParser {
         }
 
         MethodDeclaration generateSplittedMethod(MethodDeclaration parentMethod, BlockStmt block, Map<String, String> variableMap, int index) {
-
-            if (variableMap != null) {
+            String classAndMethodName = cls.getNameAsString() + "_" + parentMethod.getNameAsString();
+            // If map is null, it means the first splitted method is being generated.
+            if (variableMap == null) {
+              for (MethodDeclaration beforeMethod: befores) {
+                  for (Statement statement: beforeMethod.getBody().get().getStatements()) {
+                      block.addStatement(0, statement);
+                  }
+              }
+            } else {
                 for (Map.Entry<String, String> splitInfo : variableMap.entrySet()) {
                     String variableName = splitInfo.getKey();
                     String variableType = splitInfo.getValue();
-                    Expression readExpr = toReadExpr(parentMethod.getNameAsString(), variableName, variableType, index, false);
+                    Expression readExpr = toReadExpr(classAndMethodName, variableName, variableType, index, false);
                     block.addStatement(0, readExpr);
                 }
 
                 for (Map.Entry<String, String> fieldInfo : fieldMap.entrySet()) {
                     String variableName = fieldInfo.getKey();
                     String variableType = fieldInfo.getValue();
-                    Expression readExpr = toReadExpr(parentMethod.getNameAsString(), variableName, variableType, index, true);
+                    Expression readExpr = toReadExpr(classAndMethodName, variableName, variableType, index, true);
                     block.addStatement(0, readExpr);
                 }
             }
@@ -414,34 +445,44 @@ public class TestParser {
                 throw new IllegalArgumentException("Path: " + fullPath + " does not lead to a test class file.");
             }
         }
-
+        String repoName = "jfreechart";
         ArrayList<String> existingClasses = new ArrayList<>();
         ArrayList<String> generatedClasses = new ArrayList<>();
         for (String path : allTestFiles) {
             methods = new ArrayList<>();
+            befores = new ArrayList<>();
             testCount = 1;
-
             CompilationUnit cu = JavaParser.parse(new FileInputStream(new File(path)));
-            className = path.substring(path.lastIndexOf("/") + 1, path.lastIndexOf("."));
+            if (System.getProperty("os.name").startsWith("Windows")) {
+                className = path.substring(path.lastIndexOf("\\") + 1, path.lastIndexOf("."));
+            } else {
+                className = path.substring(path.lastIndexOf("/") + 1, path.lastIndexOf("."));
+            }
 
-            cu.addImport("org.junit.Before");
+
             ClassOrInterfaceDeclaration cls = cu.getClassByName(className).get();
+            cu.accept(new BeforeMethodsExtractor(), null);
             cu.accept(new MethodVisitorForSplit(cls,targetNames, splitNames, targetType, splitType), null);
+            FileWriter fw = new FileWriter(new File(path));
+            fw.append(cu.toString().replaceAll("ı", "i"));
+            fw.flush();
+            fw.close();
 
+            for (MethodDeclaration methodDeclaration: cls.getMethods()) {
+                cls.remove(methodDeclaration);
+            }
 
             for (MethodDeclaration m : methods) {
                 cls.addMember(m);
             }
-            String newName = className + "Generated" + testCount + "Test";
-            cls.setName(newName);
-            FileWriter fw = new FileWriter(new File(path.replace(className, newName)));
+            cls.setName(className);
+            fw = new FileWriter(new File(path.replace(repoName, repoName + "_splitted")));
             fw.append(cu.toString().replaceAll("ı", "i"));
             fw.flush();
             fw.close();
 
             if (record) {
                 existingClasses.add(className);
-                generatedClasses.add(newName);
             }
         }
         if (record) {
