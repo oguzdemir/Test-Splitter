@@ -10,10 +10,8 @@ import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.comments.LineComment;
 import com.github.javaparser.ast.expr.*;
-import com.github.javaparser.ast.expr.UnaryExpr.Operator;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ExpressionStmt;
-import com.github.javaparser.ast.stmt.IfStmt;
 import com.github.javaparser.ast.stmt.Statement;
 import com.github.javaparser.ast.type.PrimitiveType;
 import com.github.javaparser.ast.type.ReferenceType;
@@ -21,7 +19,6 @@ import com.github.javaparser.ast.type.Type;
 import com.github.javaparser.ast.type.VoidType;
 import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
 
-import javax.swing.plaf.nimbus.State;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
@@ -37,6 +34,8 @@ import java.util.*;
 public class TestParser {
 
     static ArrayList<MethodDeclaration> methods;
+    static ArrayList<MethodDeclaration> befores;
+    static ArrayList<MethodDeclaration> afters;
     static int testCount = 1;
 
     enum TargetType {
@@ -47,7 +46,7 @@ public class TestParser {
         ASSERTION, ALL_METHODS, METHOD_NAME
     }
 
-    static class MyVisitor extends VoidVisitorAdapter<Object> {
+    static class MethodVisitorForSplit extends VoidVisitorAdapter<Object> {
 
         Set<String> targetNames;
         Set<String> splitNames;
@@ -56,14 +55,56 @@ public class TestParser {
         ClassOrInterfaceDeclaration cls;
         Map<String, String> fieldMap;
 
-        public MyVisitor(ClassOrInterfaceDeclaration cls, Set<String> targetNames, Set<String> splitNames, TargetType targetType,
-            SplitType splitType) {
+        public MethodVisitorForSplit(ClassOrInterfaceDeclaration cls, Set<String> targetNames, Set<String> splitNames, TargetType targetType,
+                                     SplitType splitType) {
             this.cls = cls;
             this.targetNames = targetNames;
             this.splitNames = splitNames;
             this.targetType = targetType;
             this.splitType = splitType;
             this.fieldMap = extractFieldMap(cls);
+        }
+
+        @Override
+        public void visit(MethodDeclaration method, Object arg) {
+
+            if (checkTargetMethod(method)) {
+                Map<Integer, Map<String, String>> parsedBody = parseMethodBody(method.getBody().get().getStatements());
+
+                if (parsedBody.size() <= 1) {
+                    super.visit(method, arg);
+                    return;
+                }
+
+                BlockStmt block = new BlockStmt();
+                int splitPointNumber = 0;
+                int previousSplitStatementIndex = 0;
+                int modifiedMethodStatementIndex = 0;
+                Object[] statementArray = method.getBody().get().getStatements().toArray();
+
+                for (int stmtInd = 0; stmtInd < statementArray.length; stmtInd++, modifiedMethodStatementIndex++) {
+                    Statement s = (Statement) statementArray[stmtInd];
+                    block.addStatement(s.clone());
+
+                    if (parsedBody.containsKey(stmtInd)) {
+                        MethodDeclaration methodDeclaration = generateSplittedMethod(method, block, parsedBody.get(previousSplitStatementIndex), splitPointNumber);
+
+                        methods.add(methodDeclaration);
+                        block = new BlockStmt();
+                        splitPointNumber++;
+
+                        if (splitPointNumber == parsedBody.size()) {
+                            break;
+                        }
+                        addWriteStatements(method, parsedBody.get(stmtInd), splitPointNumber, modifiedMethodStatementIndex);
+                        modifiedMethodStatementIndex += parsedBody.get(stmtInd).size() + 1;
+
+                        previousSplitStatementIndex = stmtInd;
+                    }
+
+                }
+            }
+            super.visit(method, arg);
         }
 
         /**
@@ -260,47 +301,6 @@ public class TestParser {
 
             return methodDeclaration;
         }
-
-        @Override
-        public void visit(MethodDeclaration method, Object arg) {
-            if (checkTargetMethod(method)) {
-                Map<Integer, Map<String, String>> parsedBody = parseMethodBody(method.getBody().get().getStatements());
-
-                if (parsedBody.size() <= 1) {
-                    super.visit(method, arg);
-                    return;
-                }
-
-                BlockStmt block = new BlockStmt();
-                int splitPointNumber = 0;
-                int previousSplitStatementIndex = 0;
-                int modifiedMethodStatementIndex = 0;
-                Object[] statementArray = method.getBody().get().getStatements().toArray();
-
-                for (int stmtInd = 0; stmtInd < statementArray.length; stmtInd++, modifiedMethodStatementIndex++) {
-                    Statement s = (Statement) statementArray[stmtInd];
-                    block.addStatement(s.clone());
-
-                    if (parsedBody.containsKey(stmtInd)) {
-                        MethodDeclaration methodDeclaration = generateSplittedMethod(method, block, parsedBody.get(previousSplitStatementIndex), splitPointNumber);
-
-                        methods.add(methodDeclaration);
-                        block = new BlockStmt();
-                        splitPointNumber++;
-
-                        if (splitPointNumber == parsedBody.size()) {
-                            break;
-                        }
-                        addWriteStatements(method, parsedBody.get(stmtInd), splitPointNumber, modifiedMethodStatementIndex);
-                        modifiedMethodStatementIndex += parsedBody.get(stmtInd).size() + 1;
-
-                        previousSplitStatementIndex = stmtInd;
-                    }
-
-                }
-            }
-            super.visit(method, arg);
-        }
     }
 
     public static void validateOption(String errorMsg, String option) {
@@ -426,7 +426,7 @@ public class TestParser {
 
             cu.addImport("org.junit.Before");
             ClassOrInterfaceDeclaration cls = cu.getClassByName(className).get();
-            cu.accept(new MyVisitor(cls,targetNames, splitNames, targetType, splitType), null);
+            cu.accept(new MethodVisitorForSplit(cls,targetNames, splitNames, targetType, splitType), null);
 
 
             for (MethodDeclaration m : methods) {
