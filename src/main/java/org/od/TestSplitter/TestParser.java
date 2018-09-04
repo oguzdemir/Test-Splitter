@@ -34,7 +34,6 @@ import java.util.*;
 public class TestParser {
 
     static ArrayList<MethodDeclaration> methods;
-    static ArrayList<MethodDeclaration> befores;
     static int testCount = 1;
 
     enum TargetType {
@@ -43,15 +42,6 @@ public class TestParser {
 
     enum SplitType {
         ASSERTION, ALL_METHODS, METHOD_NAME
-    }
-
-    static class BeforeMethodsExtractor extends VoidVisitorAdapter<Object> {
-        @Override
-        public void visit(MethodDeclaration method, Object arg) {
-            if (method.getAnnotations().size() > 0 && method.getAnnotation(0).toString().equals("@Before")) {
-                befores.add(method);
-            }
-        }
     }
 
     static class MethodVisitorForSplit extends VoidVisitorAdapter<Object> {
@@ -82,15 +72,6 @@ public class TestParser {
                 Map<Integer, Map<String, String>> parsedBody = parseMethodBody(method.getBody().get().getStatements());
 
                 if (parsedBody.size() <= 1) {
-                    MethodDeclaration originalMethod = method.clone();
-                    BlockStmt originalBlock = originalMethod.getBody().get();
-
-                    for (MethodDeclaration beforeMethod: befores) {
-                        for (Statement statement: beforeMethod.getBody().get().getStatements()) {
-                            originalBlock.addStatement(0, statement);
-                        }
-                    }
-                    methods.add(originalMethod);
                     super.visit(method, arg);
                     return;
                 }
@@ -98,10 +79,10 @@ public class TestParser {
                 BlockStmt block = new BlockStmt();
                 int splitPointNumber = 0;
                 int previousSplitStatementIndex = 0;
-                int modifiedMethodStatementIndex = 0;
+                int addedStatements = 0;
                 Object[] statementArray = method.getBody().get().getStatements().toArray();
 
-                for (int stmtInd = 0; stmtInd < statementArray.length; stmtInd++, modifiedMethodStatementIndex++) {
+                for (int stmtInd = 0; stmtInd < statementArray.length; stmtInd++) {
                     Statement s = (Statement) statementArray[stmtInd];
                     block.addStatement(s.clone());
 
@@ -115,15 +96,15 @@ public class TestParser {
                         if (splitPointNumber == parsedBody.size()) {
                             break;
                         }
-                        addWriteStatements(method, parsedBody.get(stmtInd), splitPointNumber, modifiedMethodStatementIndex);
-                        modifiedMethodStatementIndex += parsedBody.get(stmtInd).size() + 1;
+                        addWriteStatements(method, parsedBody.get(stmtInd), splitPointNumber, stmtInd + addedStatements + 1);
+                        addedStatements += parsedBody.get(stmtInd).size() + fieldMap.size() + 1;
 
                         previousSplitStatementIndex = stmtInd;
                     }
 
                 }
-            } else if (!(method.getAnnotations().size() > 0 && method.getAnnotation(0).toString().equals("@Before"))) {
-                // Preserve the method if it is not annotated "Before"
+            } else {
+                // Preserve the method if it is not splitted
                 methods.add(method);
             }
 
@@ -139,8 +120,10 @@ public class TestParser {
             HashMap<String, String> fieldMap = new HashMap<>();
 
             for (FieldDeclaration fieldDeclaration: cls.getFields()) {
-                for (VariableDeclarator variableDeclarator: fieldDeclaration.getVariables()) {
-                    fieldMap.put(variableDeclarator.getNameAsString(), variableDeclarator.getType().toString());
+                if (!fieldDeclaration.isFinal()) {
+                    for (VariableDeclarator variableDeclarator: fieldDeclaration.getVariables()) {
+                        fieldMap.put(variableDeclarator.getNameAsString(), variableDeclarator.getType().toString());
+                    }
                 }
             }
 
@@ -298,13 +281,7 @@ public class TestParser {
         MethodDeclaration generateSplittedMethod(MethodDeclaration parentMethod, BlockStmt block, Map<String, String> variableMap, int index) {
             String classAndMethodName = cls.getNameAsString() + "_" + parentMethod.getNameAsString();
             // If map is null, it means the first splitted method is being generated.
-            if (variableMap == null) {
-              for (MethodDeclaration beforeMethod: befores) {
-                  for (Statement statement: beforeMethod.getBody().get().getStatements()) {
-                      block.addStatement(0, statement);
-                  }
-              }
-            } else {
+            if (variableMap != null) {
                 for (Map.Entry<String, String> splitInfo : variableMap.entrySet()) {
                     String variableName = splitInfo.getKey();
                     String variableType = splitInfo.getValue();
@@ -450,18 +427,17 @@ public class TestParser {
         ArrayList<String> generatedClasses = new ArrayList<>();
         for (String path : allTestFiles) {
             methods = new ArrayList<>();
-            befores = new ArrayList<>();
             testCount = 1;
             CompilationUnit cu = JavaParser.parse(new FileInputStream(new File(path)));
-            if (System.getProperty("os.name").startsWith("Windows")) {
-                className = path.substring(path.lastIndexOf("\\") + 1, path.lastIndexOf("."));
-            } else {
-                className = path.substring(path.lastIndexOf("/") + 1, path.lastIndexOf("."));
+            if (className == null) {
+                if (System.getProperty("os.name").startsWith("Windows")) {
+                    className = path.substring(path.lastIndexOf("\\") + 1, path.lastIndexOf("."));
+                } else {
+                    className = path.substring(path.lastIndexOf("/") + 1, path.lastIndexOf("."));
+                }
             }
 
-
             ClassOrInterfaceDeclaration cls = cu.getClassByName(className).get();
-            cu.accept(new BeforeMethodsExtractor(), null);
             cu.accept(new MethodVisitorForSplit(cls,targetNames, splitNames, targetType, splitType), null);
             FileWriter fw = new FileWriter(new File(path));
             fw.append(cu.toString().replaceAll("ı", "i"));

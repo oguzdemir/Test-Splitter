@@ -33,7 +33,11 @@ public class ObjectRecorder {
 
     public static void finalizeWriting() {
         try {
-            xstream.toXML(writtenObjects,  new FileWriter(new File("./snapshots/out_" + classAndMethodName + "_" + writeIndex + ".xml")));
+            FileWriter fw = new FileWriter(new File("./snapshots/out_" + classAndMethodName + "_" + writeIndex + ".xml"));
+            xstream.toXML(writtenObjects, fw);
+            writtenObjects = null;
+            fw.flush();
+            fw.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
