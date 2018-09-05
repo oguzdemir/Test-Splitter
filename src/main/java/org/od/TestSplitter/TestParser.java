@@ -456,7 +456,7 @@ public class TestParser {
             fw.append(cu.toString().replaceAll("ı", "i"));
             fw.flush();
             fw.close();
-
+            className = null;  
             if (record) {
                 existingClasses.add(className);
             }
