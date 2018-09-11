@@ -1,6 +1,5 @@
-package org.od.TestSplitter.Samples;
+package com.od.TestSplitter.Samples;
 
-import org.od.TestSplitter.Transformator.ObjectRecorder;
 import org.junit.Test;
 
 import static org.junit.Assert.assertTrue;

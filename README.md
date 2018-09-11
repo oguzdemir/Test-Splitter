@@ -18,33 +18,33 @@ This project aims to split complex JUnit tests into parts for various purposes.
 
 
 ``` Shell
-mvn compile exec:java -Dexec.mainClass="org.od.TestSplitter.TestParser" -Dexec.args="<arguments>"
+mvn compile exec:java -Dexec.mainClass="com.od.TestSplitter.TestParser" -Dexec.args="<arguments>"
 ```
 
 _Path should be given in Unix style in all platforms_
 &nbsp;\
 &nbsp;
 
-__[BankAccount Example](./src/main/java/org/od/TestSplitter/Samples/BankAccountTest.java)__
+__[BankAccount Example](src/main/java/com/od/TestSplitter/Samples/BankAccountTest.java)__
 
 _The original tests will be `@Before` function of the generated test class._
 
 * Splitting the test from specific methods
 ``` Shell
- mvn compile exec:java -Dexec.mainClass="org.od.TestSplitter.TestParser" \
+ mvn compile exec:java -Dexec.mainClass="com.od.TestSplitter.TestParser" \
      -Dexec.args="-p ./src/main/java/org/od/TestSplitter/Samples/ \
      -c BankAccountTest -t testS0 -s withdrawMoney -s addMoney"
 ```
 
 * Splitting the test from all assertions
 ``` Shell
- mvn compile exec:java -Dexec.mainClass="org.od.TestSplitter.TestParser" \
+ mvn compile exec:java -Dexec.mainClass="com.od.TestSplitter.TestParser" \
      -Dexec.args="-p ./src/main/java/org/od/TestSplitter/Samples/ -c BankAccountTest -t testS0 -a"
 ```
 
 * Splitting the test from all methods
 ``` Shell
- mvn compile exec:java -Dexec.mainClass="org.od.TestSplitter.TestParser" \
+ mvn compile exec:java -Dexec.mainClass="com.od.TestSplitter.TestParser" \
      -Dexec.args="-p ./src/main/java/org/od/TestSplitter/Samples/ -c BankAccountTest -t testS0"
 ```
 

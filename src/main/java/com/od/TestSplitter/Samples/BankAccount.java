@@ -1,4 +1,4 @@
-package org.od.TestSplitter.Samples;
+package com.od.TestSplitter.Samples;
 
 import java.io.Serializable;
 

@@ -1,4 +1,4 @@
-package org.od.TestSplitter;
+package com.od.TestSplitter;
 
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ast.CompilationUnit;
@@ -22,6 +22,7 @@ import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
+import java.lang.annotation.Annotation;
 import java.util.*;
 
 /**
@@ -72,6 +73,7 @@ public class TestParser {
                 Map<Integer, Map<String, String>> parsedBody = parseMethodBody(method.getBody().get().getStatements());
 
                 if (parsedBody.size() <= 1) {
+                    methods.add(method);
                     super.visit(method, arg);
                     return;
                 }
@@ -146,7 +148,7 @@ public class TestParser {
             if (type.isPrimitiveType()) {
                 castType = ((PrimitiveType) type).toBoxedType();
             }
-            NameExpr clazz = new NameExpr("org.od.TestSplitter.Transformator.ObjectRecorder");
+            NameExpr clazz = new NameExpr("com.od.TestSplitter.Transformator.ObjectRecorder");
             MethodCallExpr call = new MethodCallExpr(clazz, "readObject");
             call.addArgument(new StringLiteralExpr(classAndMethodName));
             call.addArgument(new IntegerLiteralExpr(index));
@@ -163,7 +165,7 @@ public class TestParser {
 
         Expression toWriteExpr(String classAndMethodName, String variable, int index, boolean isThis) {
             NameExpr objectRecorderClass = new NameExpr(
-                    "org.od.TestSplitter.Transformator.ObjectRecorder");
+                    "com.od.TestSplitter.Transformator.ObjectRecorder");
             MethodCallExpr writeCallExpr = new MethodCallExpr(objectRecorderClass, "writeObject");
             writeCallExpr.addArgument(new StringLiteralExpr(classAndMethodName));
             if (isThis) {
@@ -181,7 +183,7 @@ public class TestParser {
 
             methodBlock.getStatement(statementIndex).setComment(new LineComment("Split Point: " + splitIndex));
 
-            NameExpr clazz = new NameExpr("org.od.TestSplitter.Transformator.ObjectRecorder");
+            NameExpr clazz = new NameExpr("com.od.TestSplitter.Transformator.ObjectRecorder");
             MethodCallExpr call = new MethodCallExpr(clazz, "finalizeWriting");
             methodBlock.addStatement(statementIndex, call);
 
@@ -271,7 +273,7 @@ public class TestParser {
 
         boolean checkTargetMethod(MethodDeclaration method) {
             boolean isGenerated = method.getName().toString().startsWith("generated");
-            boolean isTest =  method.getAnnotations().size() > 0 && method.getAnnotation(0).toString().equals("@Test");
+            boolean isTest =  method.getAnnotations().size() > 0 && method.getAnnotations().contains(new MarkerAnnotationExpr("Test"));
 
             return !isGenerated &&
                     isTest &&
@@ -301,7 +303,9 @@ public class TestParser {
             EnumSet<Modifier> modifiers = EnumSet.of(Modifier.PUBLIC);
             MethodDeclaration methodDeclaration = new MethodDeclaration(modifiers, new VoidType(),
                     "generatedU" + testCount++);
-            methodDeclaration.addAnnotation(parentMethod.getAnnotation(0));
+            for(AnnotationExpr a: parentMethod.getAnnotations()) {
+                methodDeclaration.addAnnotation(a);
+            }
             for (ReferenceType referenceType: parentMethod.getThrownExceptions()) {
                 methodDeclaration.addThrownException(referenceType);
             }
