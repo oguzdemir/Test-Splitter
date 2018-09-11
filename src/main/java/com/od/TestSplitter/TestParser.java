@@ -350,6 +350,7 @@ public class TestParser {
          */
         String classPath = null;
         String className = null;
+        String repository = null;
         Set<String> targetNames = new HashSet<>();
         Set<String> splitNames = new HashSet<>();
         TargetType targetType = TargetType.ALL_METHODS;
@@ -374,6 +375,11 @@ public class TestParser {
                     validateOption("Class name should be specified after option -c",
                         nextArgument);
                     className = nextArgument;
+                    break;
+                case "-r":
+                    validateOption("Repository name should be specified after option -r",
+                            nextArgument);
+                    repository = nextArgument;
                     break;
                 case "-t":
                     validateOption("Target method should be specified after option -t",
@@ -426,7 +432,6 @@ public class TestParser {
                 throw new IllegalArgumentException("Path: " + fullPath + " does not lead to a test class file.");
             }
         }
-        String repoName = "jfreechart";
         ArrayList<String> existingClasses = new ArrayList<>();
         ArrayList<String> generatedClasses = new ArrayList<>();
         for (String path : allTestFiles) {
@@ -456,7 +461,7 @@ public class TestParser {
                 cls.addMember(m);
             }
             cls.setName(className);
-            fw = new FileWriter(new File(path.replace(repoName, repoName + "_splitted")));
+            fw = new FileWriter(new File(path.replace(repository, repository + "_splitted")));
             fw.append(cu.toString().replaceAll("ı", "i"));
             fw.flush();
             fw.close();

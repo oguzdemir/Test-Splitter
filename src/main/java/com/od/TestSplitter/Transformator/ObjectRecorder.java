@@ -2,6 +2,8 @@ package com.od.TestSplitter.Transformator;
 
 import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.converters.reflection.*;
+import com.thoughtworks.xstream.core.ClassLoaderReference;
+import com.thoughtworks.xstream.mapper.Mapper;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -15,60 +17,40 @@ import java.util.ArrayList;
  */
 public class ObjectRecorder {
 
-    // Private xstream object for serialize-deserialize
-    //private static XStream xstream = new XStream();
-    private static XStream xstream = new XStream(new MyPureJavaReflectionProvider());
+    private static ObjectRecorder instance = new ObjectRecorder();
 
-    static class MyPureJavaReflectionProvider extends SunUnsafeReflectionProvider {
-
-        public MyPureJavaReflectionProvider() {
-            this(new FieldDictionary(new ImmutableFieldKeySorter()));
-        }
-
-        public MyPureJavaReflectionProvider(FieldDictionary fieldDictionary) {
-            super(fieldDictionary);
-        }
-
-        protected boolean fieldModifiersSupported(Field field) {
-            int modifiers = field.getModifiers();
-            return !Modifier.isStatic(modifiers);
-        }
-
-        public boolean fieldDefinedInClass(String fieldName, Class type) {
-            Field field = fieldDictionary.fieldOrNull(type, fieldName, null);
-            return field != null && fieldModifiersSupported(field);
-        }
-    }
+    private XStream xstream;
 
     // Objects are firstly stored in a list, then serialized as a list.
-    private static ArrayList<Object> writtenObjects;
+    private ArrayList<Object> writtenObjects;
 
     // Object are firstly deserialized as list, then returned one at a time.
-    private static ArrayList<Object> readObjects;
+    private ArrayList<Object> readObjects;
     // The index of the next object is stored to return the objects in order.
-    private static int readObjectIndex;
+    private int readObjectIndex;
 
     // The data stored to detect when a new method is called for read operations.
-    private static String readMethod;
-    private static int readIndex;
+    private String readMethod;
+    private int readIndex;
 
     // The data needed for writing the serialized objects.
-    private static int writeIndex;
-    private static String classAndMethodName;
+    private int writeIndex;
+    private String classAndMethodName;
 
+    private ObjectRecorder() {
+        xstream = new XStream(new SplitterJavaReflectionProvider());
+    }
 
-
-    public static void writeObject(String classAndMethodName, Object object, int writeIndex) {
+    private void writeObjectHelper(String classAndMethodName, Object object, int writeIndex) {
         if (writtenObjects == null) {
-            ObjectRecorder.classAndMethodName = classAndMethodName;
-            ObjectRecorder.writeIndex = writeIndex;
+            this.classAndMethodName = classAndMethodName;
+            this.writeIndex = writeIndex;
             writtenObjects = new ArrayList<>();
         }
-
         writtenObjects.add(object);
     }
 
-    public static void finalizeWriting() {
+    private void finalizeWritingHelper() {
         try {
             FileWriter fw = new FileWriter(new File("./snapshots/out_" + classAndMethodName + "_" + writeIndex + ".xml"));
             xstream.toXML(writtenObjects, fw);
@@ -80,20 +62,52 @@ public class ObjectRecorder {
         }
     }
 
-    public static Object readObject(String classAndMethodName, int index) {
+    private Object readObjectHelper(String classAndMethodName, int index) {
         try {
             if (!classAndMethodName.equals(readMethod) || index != readIndex) {
                 readObjectIndex = 0;
-                readObjects = (ArrayList) xstream.fromXML(new File("./snapshots/out_" + classAndMethodName + "_" + index + ".xml"));
                 readIndex = index;
                 readMethod = classAndMethodName;
+                readObjects = (ArrayList) xstream.fromXML(new File("./snapshots/out_" + classAndMethodName + "_" + index + ".xml"));
+
             }
         } catch (Exception e) {
-            System.err.println("Objects cannot be read");
-            e.printStackTrace();
+            //System.err.println(e.getMessage());
             return null;
         }
         return readObjects.get(readObjectIndex++);
     }
 
+    public static void writeObject(String classAndMethodName, Object object, int writeIndex) {
+        instance.writeObjectHelper(classAndMethodName, object, writeIndex);
+    }
+
+    public static void finalizeWriting() {
+        instance.finalizeWritingHelper();
+    }
+
+    public static Object readObject(String classAndMethodName, int index) {
+        return instance.readObjectHelper(classAndMethodName, index);
+    }
+}
+
+class SplitterJavaReflectionProvider extends SunUnsafeReflectionProvider {
+
+    public SplitterJavaReflectionProvider() {
+        this(new FieldDictionary(new ImmutableFieldKeySorter()));
+    }
+
+    public SplitterJavaReflectionProvider(FieldDictionary fieldDictionary) {
+        super(fieldDictionary);
+    }
+
+    protected boolean fieldModifiersSupported(Field field) {
+        int modifiers = field.getModifiers();
+        return !Modifier.isStatic(modifiers);
+    }
+
+    public boolean fieldDefinedInClass(String fieldName, Class type) {
+        Field field = fieldDictionary.fieldOrNull(type, fieldName, null);
+        return field != null && fieldModifiersSupported(field);
+    }
 }
