@@ -1,13 +1,14 @@
 package com.od.TestSplitter.Transformator;
 
 import com.thoughtworks.xstream.XStream;
-import com.thoughtworks.xstream.converters.reflection.*;
-import com.thoughtworks.xstream.core.ClassLoaderReference;
-import com.thoughtworks.xstream.mapper.Mapper;
-
+import com.thoughtworks.xstream.converters.reflection.FieldDictionary;
+import com.thoughtworks.xstream.converters.reflection.ImmutableFieldKeySorter;
+import com.thoughtworks.xstream.converters.reflection.ReflectionConverter;
+import com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -38,7 +39,11 @@ public class ObjectRecorder {
     private String classAndMethodName;
 
     private ObjectRecorder() {
-        xstream = new XStream(new SplitterJavaReflectionProvider());
+        SplitterJavaReflectionProvider splitterJavaReflectionProvider = new SplitterJavaReflectionProvider();
+        xstream = new XStream(splitterJavaReflectionProvider);
+        xstream.registerConverter(
+            new ReflectionConverter(xstream.getMapper(), splitterJavaReflectionProvider, Serializable.class),
+            XStream.PRIORITY_LOW);
     }
 
     private void writeObjectHelper(String classAndMethodName, Object object, int writeIndex) {
