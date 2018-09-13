@@ -22,7 +22,6 @@ import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
-import java.lang.annotation.Annotation;
 import java.util.*;
 
 /**
@@ -35,6 +34,7 @@ import java.util.*;
 public class TestParser {
 
     static ArrayList<MethodDeclaration> methods;
+    static ArrayList<VariableDeclarationExpr> emptyDeclarations;
     static int testCount = 1;
 
     enum TargetType {
@@ -254,7 +254,17 @@ public class TestParser {
                         ((ExpressionStmt) statement).getExpression() instanceof VariableDeclarationExpr) {
                     VariableDeclarationExpr stmt = (VariableDeclarationExpr) (((ExpressionStmt) statement)
                             .getExpression());
+                    if(stmt.getModifiers().size() == 0) {
+                        emptyDeclarations.add(stmt);
+                    }
                     for (VariableDeclarator declarator : stmt.getVariables()) {
+                        if (!declarator.getInitializer().isPresent()) {
+                            if (!declarator.getType().isPrimitiveType()) {
+                                declarator.setInitializer(new NullLiteralExpr());
+                            } else {
+                                declarator.setInitializer(new IntegerLiteralExpr(0));
+                            }
+                        }
                         splitInformation.put(declarator.getNameAsString(), declarator.getType().toString());
                     }
                 }
@@ -436,6 +446,7 @@ public class TestParser {
         ArrayList<String> generatedClasses = new ArrayList<>();
         for (String path : allTestFiles) {
             methods = new ArrayList<>();
+            emptyDeclarations = new ArrayList<>();
             testCount = 1;
             CompilationUnit cu = JavaParser.parse(new FileInputStream(new File(path)));
             if (className == null) {
