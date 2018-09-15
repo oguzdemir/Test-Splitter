@@ -1,10 +1,15 @@
 package com.od.TestSplitter.Transformator;
 
 import com.thoughtworks.xstream.XStream;
+import com.thoughtworks.xstream.converters.Converter;
+import com.thoughtworks.xstream.converters.MarshallingContext;
 import com.thoughtworks.xstream.converters.reflection.FieldDictionary;
 import com.thoughtworks.xstream.converters.reflection.ImmutableFieldKeySorter;
 import com.thoughtworks.xstream.converters.reflection.ReflectionConverter;
+import com.thoughtworks.xstream.converters.reflection.ReflectionProvider;
 import com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider;
+import com.thoughtworks.xstream.io.HierarchicalStreamWriter;
+import com.thoughtworks.xstream.mapper.Mapper;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -42,8 +47,12 @@ public class ObjectRecorder {
         SplitterJavaReflectionProvider splitterJavaReflectionProvider = new SplitterJavaReflectionProvider();
         xstream = new XStream(splitterJavaReflectionProvider);
         xstream.registerConverter(
-            new ReflectionConverter(xstream.getMapper(), splitterJavaReflectionProvider, Serializable.class),
-            XStream.PRIORITY_LOW);
+            new SplitterReflectionConverter(xstream.getMapper(), splitterJavaReflectionProvider, Serializable.class),
+        XStream.PRIORITY_LOW);
+    }
+
+    public static Converter getConverter(Class cls) {
+        return instance.xstream.getConverterLookup().lookupConverterForType(cls);
     }
 
     private void writeObjectHelper(String classAndMethodName, Object object, int writeIndex) {
@@ -114,5 +123,27 @@ class SplitterJavaReflectionProvider extends SunUnsafeReflectionProvider {
     public boolean fieldDefinedInClass(String fieldName, Class type) {
         Field field = fieldDictionary.fieldOrNull(type, fieldName, null);
         return field != null && fieldModifiersSupported(field);
+    }
+
+
+}
+
+class SplitterReflectionConverter extends ReflectionConverter {
+
+    public SplitterReflectionConverter(Mapper mapper,
+        ReflectionProvider reflectionProvider, Class type) {
+        super(mapper, reflectionProvider, type);
+    }
+
+    @Override
+    protected boolean shouldUnmarshalTransientFields() {
+        return true;
+    }
+
+    @Override
+    protected void doMarshal(Object source, HierarchicalStreamWriter writer,
+        MarshallingContext context) {
+        System.out.println("X");
+        super.doMarshal(source, writer, context);
     }
 }
