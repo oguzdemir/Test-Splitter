@@ -47,8 +47,14 @@ public class ObjectRecorder {
         SplitterJavaReflectionProvider splitterJavaReflectionProvider = new SplitterJavaReflectionProvider();
         xstream = new XStream(splitterJavaReflectionProvider);
         xstream.registerConverter(
-            new SplitterReflectionConverter(xstream.getMapper(), splitterJavaReflectionProvider, Serializable.class),
-        XStream.PRIORITY_LOW);
+            new SplitterReflectionConverter(xstream.getMapper(), splitterJavaReflectionProvider,
+                Serializable.class),
+            XStream.PRIORITY_LOW);
+
+        File file = new File("./snapshots/");
+        if (!file.exists()) {
+            file.mkdirs();
+        }
     }
 
     public static Converter getConverter(Class cls) {
@@ -66,7 +72,8 @@ public class ObjectRecorder {
 
     private void finalizeWritingHelper() {
         try {
-            FileWriter fw = new FileWriter(new File("./snapshots/out_" + classAndMethodName + "_" + writeIndex + ".xml"));
+            FileWriter fw = new FileWriter(
+                new File("./snapshots/out_" + classAndMethodName + "_" + writeIndex + ".xml"));
             xstream.toXML(writtenObjects, fw);
             writtenObjects = null;
             fw.flush();
@@ -82,7 +89,8 @@ public class ObjectRecorder {
                 readObjectIndex = 0;
                 readIndex = index;
                 readMethod = classAndMethodName;
-                readObjects = (ArrayList) xstream.fromXML(new File("./snapshots/out_" + classAndMethodName + "_" + index + ".xml"));
+                readObjects = (ArrayList) xstream.fromXML(
+                    new File("./snapshots/out_" + classAndMethodName + "_" + index + ".xml"));
 
             }
         } catch (Exception e) {
@@ -143,7 +151,14 @@ class SplitterReflectionConverter extends ReflectionConverter {
     @Override
     protected void doMarshal(Object source, HierarchicalStreamWriter writer,
         MarshallingContext context) {
-        System.out.println("X");
         super.doMarshal(source, writer, context);
+    }
+
+    @Override
+    public boolean canConvert(Class type) {
+        if (type instanceof Serializable) {
+            return true;
+        }
+        return super.canConvert(type);
     }
 }

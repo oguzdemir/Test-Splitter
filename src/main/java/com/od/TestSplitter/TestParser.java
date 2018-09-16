@@ -488,7 +488,7 @@ public class TestParser {
                 cls.addMember(m);
             }
             cls.setName(className);
-            fw = new FileWriter(new File(path.replace(repository, repository + "_splitted")));
+            fw = new FileWriter(new File(path.replaceFirst(repository, repository + "_splitted")));
             fw.append(cu.toString().replaceAll("ı", "i"));
             fw.flush();
             fw.close();
