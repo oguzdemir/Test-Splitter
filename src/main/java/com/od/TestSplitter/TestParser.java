@@ -197,14 +197,17 @@ public class TestParser {
 
         void addWriteStatements(MethodDeclaration method, Map<String, String> variableMap, int splitIndex, int statementIndex) {
             BlockStmt methodBlock = method.getBody().get();
+            String classAndMethodName = cls.getNameAsString() + "_" + method.getNameAsString();
 
             methodBlock.getStatement(statementIndex).setComment(new LineComment("Split Point: " + splitIndex));
 
             NameExpr clazz = new NameExpr("com.od.TestSplitter.Transformator.ObjectRecorder");
             MethodCallExpr call = new MethodCallExpr(clazz, "finalizeWriting");
+            call.addArgument(new StringLiteralExpr(classAndMethodName));
+            call.addArgument(new IntegerLiteralExpr(splitIndex));
             methodBlock.addStatement(statementIndex, call);
 
-            String classAndMethodName = cls.getNameAsString() + "_" + method.getNameAsString();
+
             for (Map.Entry<String, String> splitInfo : variableMap.entrySet()) {
                 String variableName = splitInfo.getKey();
                 Expression writeExpr = toWriteExpr(classAndMethodName,variableName, splitIndex, false);
