@@ -11,6 +11,7 @@ import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.comments.LineComment;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.AssignExpr;
+import com.github.javaparser.ast.expr.BooleanLiteralExpr;
 import com.github.javaparser.ast.expr.CastExpr;
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.FieldAccessExpr;
@@ -277,6 +278,8 @@ public class TestParser {
                         if (!declarator.getInitializer().isPresent()) {
                             if (!declarator.getType().isPrimitiveType()) {
                                 declarator.setInitializer(new NullLiteralExpr());
+                            } else if (declarator.getType().equals(PrimitiveType.booleanType())) {
+                                declarator.setInitializer(new BooleanLiteralExpr(false));
                             } else {
                                 declarator.setInitializer(new IntegerLiteralExpr(0));
                             }

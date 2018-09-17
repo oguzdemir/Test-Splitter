@@ -17,6 +17,7 @@
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>
+                    <outputDirectory>../</outputDirectory>
                 </configuration>
                 <executions>
                     <execution>
