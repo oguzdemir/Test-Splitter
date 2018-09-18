@@ -2,6 +2,7 @@ package com.od.TestSplitter;
 
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.ImportDeclaration;
 import com.github.javaparser.ast.Modifier;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
@@ -34,6 +35,7 @@ import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -347,13 +349,13 @@ public class TestParser {
         }
     }
 
-    public static void validateOption(String errorMsg, String option) {
+    private static void validateOption(String errorMsg, String option) {
         if (option == null || option.startsWith("-")) {
             throw new IllegalArgumentException(errorMsg);
         }
     }
 
-    public static void findAllFiles(ArrayList<String> fileList, File file) {
+    private static void findAllFiles(ArrayList<String> fileList, File file) {
         File[] list = file.listFiles();
         if (list != null) {
             for (File fil : list) {
@@ -365,6 +367,22 @@ public class TestParser {
                 }
             }
         }
+    }
+
+    private static void writeClassToFile(CompilationUnit cu, String filePath) throws IOException{
+        FileWriter fw = new FileWriter(new File(filePath));
+        fw.append(cu.toString().replaceAll("ı", "i"));
+        fw.flush();
+        fw.close();
+    }
+
+    private static boolean checkConcurrentImports(CompilationUnit cu) {
+        for(ImportDeclaration importDeclaration: cu.getImports()) {
+            if (importDeclaration.toString().startsWith("import java.util.concurrent")) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public static void main(String[] args) throws Exception {
@@ -480,11 +498,14 @@ public class TestParser {
             }
 
             ClassOrInterfaceDeclaration cls = cu.getClassByName(className).get();
+            if (cls.getModifiers().contains(Modifier.ABSTRACT) || !checkConcurrentImports(cu)) {
+                writeClassToFile(cu, path);
+                writeClassToFile(cu, path.replaceFirst(repository, repository + "_splitted"));
+                className = null;
+                continue;
+            }
             cu.accept(new MethodVisitorForSplit(cls,targetNames, splitNames, targetType, splitType), null);
-            FileWriter fw = new FileWriter(new File(path));
-            fw.append(cu.toString().replaceAll("ı", "i"));
-            fw.flush();
-            fw.close();
+            writeClassToFile(cu, path);
 
             for (MethodDeclaration methodDeclaration: cls.getMethods()) {
                 cls.remove(methodDeclaration);
@@ -494,10 +515,8 @@ public class TestParser {
                 cls.addMember(m);
             }
             cls.setName(className);
-            fw = new FileWriter(new File(path.replaceFirst(repository, repository + "_splitted")));
-            fw.append(cu.toString().replaceAll("ı", "i"));
-            fw.flush();
-            fw.close();
+            writeClassToFile(cu, path.replaceFirst(repository, repository + "_splitted"));
+
             className = null;  
             if (record) {
                 existingClasses.add(className);
