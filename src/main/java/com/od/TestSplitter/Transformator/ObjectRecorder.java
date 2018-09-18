@@ -14,10 +14,8 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Serializable;
-import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -26,13 +24,17 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class ObjectRecorder {
 
+    public static ObjectRecorder getInstance() {
+        return instance;
+    }
+
     private static final String SNAPSHOT_URL = "./snapshots/";
     private static ObjectRecorder instance = new ObjectRecorder();
 
-    private XStream xstream;
+    public XStream xstream;
 
     // Objects are firstly stored in a list, then serialized as a list, mapped with user method
-    private ConcurrentHashMap<String, ArrayList<Object>> writtenObjects;
+    private ConcurrentHashMap<String, LinkedList<Object>> writtenObjects;
 
     // Object are firstly deserialized as list, then returned one at a time, mapped with user method
     private ConcurrentHashMap<String, LinkedList<Object>> readObjects;
@@ -61,11 +63,11 @@ public class ObjectRecorder {
 
     private void writeObjectHelper(String writePath, Object object) {
         if (!writtenObjects.containsKey(writePath)) {
-            ArrayList<Object> objects = new ArrayList<>();
+            LinkedList<Object> objects = new LinkedList<>();
             objects.add(object);
             writtenObjects.put(writePath, objects);
         } else {
-            writtenObjects.get(writePath).add(object);
+            writtenObjects.get(writePath).addLast(object);
         }
     }
 
@@ -87,10 +89,11 @@ public class ObjectRecorder {
     private Object readObjectHelper(String readPath) {
         if (!readObjects.containsKey(readPath)) {
             try {
-                LinkedList list = (LinkedList) xstream.fromXML(readPath);
+                LinkedList list = (LinkedList) xstream.fromXML(new File(readPath));
                 readObjects.put(readPath, list);
             }
             catch (Exception e) {
+                e.printStackTrace();
                 return null;
             }
         }
