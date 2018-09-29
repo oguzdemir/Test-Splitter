@@ -37,6 +37,7 @@ import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -472,6 +473,7 @@ public class TestParser {
 
         ArrayList<String> allTestFiles = new ArrayList<>();
         if (className == null) {
+            System.out.println("Classpath:" + classPath);
             findAllFiles(allTestFiles, new File(classPath));
         } else {
             String fullPath = classPath + className + ".java";
@@ -482,6 +484,8 @@ public class TestParser {
                 throw new IllegalArgumentException("Path: " + fullPath + " does not lead to a test class file.");
             }
         }
+        System.out.println("Arguments: " + Arrays.toString(args));
+        System.out.println("Found test files:" + allTestFiles.size());
         ArrayList<String> existingClasses = new ArrayList<>();
         ArrayList<String> generatedClasses = new ArrayList<>();
         for (String path : allTestFiles) {
@@ -500,7 +504,8 @@ public class TestParser {
             ClassOrInterfaceDeclaration cls = cu.getClassByName(className).get();
             if (cls.getModifiers().contains(Modifier.ABSTRACT) || !checkConcurrentImports(cu)) {
                 writeClassToFile(cu, path);
-                writeClassToFile(cu, path.replaceFirst(repository, repository + "_splitted"));
+                String newClassPath = classPath.substring(0, classPath.length() - 1) + "_splitted/";
+                writeClassToFile(cu, path.replaceFirst(classPath, newClassPath));
                 className = null;
                 continue;
             }
@@ -515,9 +520,10 @@ public class TestParser {
                 cls.addMember(m);
             }
             cls.setName(className);
-            writeClassToFile(cu, path.replaceFirst(repository, repository + "_splitted"));
+            String newClassPath = classPath.substring(0, classPath.length() - 1) + "_splitted/";
+            writeClassToFile(cu, path.replaceFirst(classPath, newClassPath));
 
-            className = null;  
+            className = null;
             if (record) {
                 existingClasses.add(className);
             }
