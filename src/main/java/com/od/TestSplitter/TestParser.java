@@ -12,6 +12,7 @@ import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.comments.LineComment;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.AssignExpr;
+import com.github.javaparser.ast.expr.BinaryExpr;
 import com.github.javaparser.ast.expr.BooleanLiteralExpr;
 import com.github.javaparser.ast.expr.CastExpr;
 import com.github.javaparser.ast.expr.Expression;
@@ -23,6 +24,7 @@ import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.expr.NullLiteralExpr;
 import com.github.javaparser.ast.expr.StringLiteralExpr;
 import com.github.javaparser.ast.expr.ThisExpr;
+import com.github.javaparser.ast.expr.UnaryExpr;
 import com.github.javaparser.ast.expr.VariableDeclarationExpr;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ExpressionStmt;
@@ -31,6 +33,7 @@ import com.github.javaparser.ast.type.PrimitiveType;
 import com.github.javaparser.ast.type.ReferenceType;
 import com.github.javaparser.ast.type.Type;
 import com.github.javaparser.ast.type.VoidType;
+import com.github.javaparser.ast.visitor.GenericListVisitorAdapter;
 import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -41,8 +44,12 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
+import javafx.collections.transformation.SortedList;
 
 /**
  * This file extracts the statements for variable declarations and assertions in the test source via
@@ -84,6 +91,91 @@ public class TestParser {
             this.fieldMap = extractFieldMap(cls);
         }
 
+        void processExpr(Set<String> defs, Set<String> uses, Expression expression) {
+            if (expression == null) {
+                return;
+            }
+
+            if (expression instanceof MethodCallExpr) {
+                for(Expression e: ((MethodCallExpr) expression).getArguments()) {
+                    processExpr(defs,uses,e);
+                }
+            } else if (expression instanceof VariableDeclarationExpr) {
+                for (VariableDeclarator variableDeclarator: ((VariableDeclarationExpr) expression).getVariables()) {
+                    defs.add(variableDeclarator.getNameAsString());
+                    processExpr(defs, uses, variableDeclarator.getInitializer().get());
+                }
+            } else if (expression instanceof AssignExpr) {
+                defs.add(((AssignExpr) expression).getTarget().toString());
+                processExpr(defs, uses, ((AssignExpr) expression).getValue());
+            } else if (expression instanceof NameExpr){
+                uses.add(((NameExpr) expression).getNameAsString());
+            } else if (expression instanceof BinaryExpr) {
+                processExpr(defs, uses, ((BinaryExpr) expression).getLeft());
+                processExpr(defs, uses, ((BinaryExpr) expression).getRight());
+            } else if (expression instanceof UnaryExpr) {
+                processExpr(defs, uses, ((UnaryExpr) expression).getExpression());
+            }
+         }
+
+        Map<Integer, String> optimizeVariables(MethodDeclaration method,  Map<Integer, Map<String, String>> variables) {
+            HashMap<Integer,String> neededDecl = new HashMap<>();
+            Set<Integer> splitIndexes= variables.keySet();
+
+            int size = method.getBody().get().getStatements().size();
+
+            int ind = (Integer) new TreeSet(splitIndexes).first();
+
+            HashMap<String, Integer> shouldBeRemovedDefs = new HashMap<>();
+            HashSet<String> cannotBeRemovedUses = new HashSet<>();
+
+
+            List<Statement> statements = method.getBody().get().getStatements();
+            int prevSplit = ind;
+            for (int i = ind + 1; i < size; i++) {
+                Statement statement = statements.get(i);
+                if (statement.isExpressionStmt()) {
+                    HashSet<String> defs = new HashSet<>();
+                    HashSet<String> uses = new HashSet<>();
+                    processExpr(defs, uses, statement.asExpressionStmt().getExpression());
+                    defs.removeAll(uses);
+                    for (String s: uses) {
+                        if (!shouldBeRemovedDefs.containsKey(s)) {
+                            cannotBeRemovedUses.add(s);
+                        }
+                    }
+                    for (String s: defs) {
+                        if (!cannotBeRemovedUses.contains(s)) {
+                            shouldBeRemovedDefs.put(s, i);
+                        }
+                    }
+
+                }
+
+                if (splitIndexes.contains(i)) {
+                    Map<String, String> currentVars = variables.get(prevSplit);
+                    neededDecl.replaceAll((k, v) -> v + "%" + currentVars.get(k));
+                    currentVars.keySet().removeIf(s -> {
+                        if (cannotBeRemovedUses.contains(s)) {
+                            return false;
+                        }
+                        else {
+                            if (currentVars.containsKey(s)) {
+                                neededDecl.put(shouldBeRemovedDefs.get(s),
+                                    s + "%" + currentVars.get(s));
+                            }
+                            return true;
+                        }
+                    });
+                    currentVars.keySet().retainAll(cannotBeRemovedUses);
+                    shouldBeRemovedDefs.clear();
+                    cannotBeRemovedUses.clear();
+                    prevSplit = i;
+                }
+            }
+            return neededDecl;
+        }
+
         @Override
         public void visit(MethodDeclaration method, Object arg) {
             if (!method.getParentNode().get().equals(cls)) {
@@ -91,7 +183,7 @@ public class TestParser {
             }
             if (checkTargetMethod(method)) {
                 Map<Integer, Map<String, String>> parsedBody = parseMethodBody(method.getBody().get().getStatements());
-
+                Map<Integer, String> neededDecs = optimizeVariables(method, parsedBody);
                 if (parsedBody.size() <= 1) {
                     methods.add(method);
                     super.visit(method, arg);
@@ -106,7 +198,29 @@ public class TestParser {
 
                 for (int stmtInd = 0; stmtInd < statementArray.length; stmtInd++) {
                     Statement s = (Statement) statementArray[stmtInd];
-                    block.addStatement(s.clone());
+                    Statement sClone = s.clone();
+                    if (neededDecs.containsKey(stmtInd)) {
+                        String[] varAndType = neededDecs.get(stmtInd).split("%");
+                        String var = varAndType[0];
+                        String typeName = varAndType[1];
+
+                        if (sClone.asExpressionStmt().getExpression() instanceof AssignExpr) {
+                            AssignExpr expr = (AssignExpr) sClone.asExpressionStmt().getExpression();
+                            if (var.equals(expr.getTarget().toString())){
+                                Type type = JavaParser.parseType(typeName);
+                                VariableDeclarator v = new VariableDeclarator(type, var, expr.getValue());
+                                sClone = new ExpressionStmt(new VariableDeclarationExpr(v));
+                                if (s.getComment().isPresent())
+                                    sClone.setComment(s.getComment().get());
+                            } else {
+                                System.err.println("Var names doesnt match!");
+                            }
+                        } else {
+                            System.err.println("Assign expression expected!");
+                        }
+
+                    }
+                    block.addStatement(sClone);
 
                     if (parsedBody.containsKey(stmtInd)) {
                         MethodDeclaration methodDeclaration = generateSplittedMethod(method, block, parsedBody.get(previousSplitStatementIndex), splitPointNumber);
@@ -151,6 +265,7 @@ public class TestParser {
 
             return fieldMap;
         }
+
         /**
          * Creates a read expression to recover the state of a variable or state
          *
@@ -204,11 +319,13 @@ public class TestParser {
 
             methodBlock.getStatement(statementIndex).setComment(new LineComment("Split Point: " + splitIndex));
 
-            NameExpr clazz = new NameExpr("com.od.TestSplitter.Transformator.ObjectRecorder");
-            MethodCallExpr call = new MethodCallExpr(clazz, "finalizeWriting");
-            call.addArgument(new StringLiteralExpr(classAndMethodName));
-            call.addArgument(new IntegerLiteralExpr(splitIndex));
-            methodBlock.addStatement(statementIndex, call);
+            if (variableMap.size() > 0 || fieldMap.size() > 0) {
+                NameExpr clazz = new NameExpr("com.od.TestSplitter.Transformator.ObjectRecorder");
+                MethodCallExpr call = new MethodCallExpr(clazz, "finalizeWriting");
+                call.addArgument(new StringLiteralExpr(classAndMethodName));
+                call.addArgument(new IntegerLiteralExpr(splitIndex));
+                methodBlock.addStatement(statementIndex, call);
+            }
 
 
             for (Map.Entry<String, String> splitInfo : variableMap.entrySet()) {
@@ -263,6 +380,7 @@ public class TestParser {
             }
             return split;
         }
+
 
         Map<Integer, Map<String, String>> parseMethodBody(NodeList<Statement> statements) {
 
@@ -401,7 +519,6 @@ public class TestParser {
          */
         String classPath = null;
         String className = null;
-        String repository = null;
         Set<String> targetNames = new HashSet<>();
         Set<String> splitNames = new HashSet<>();
         TargetType targetType = TargetType.ALL_METHODS;
@@ -426,11 +543,6 @@ public class TestParser {
                     validateOption("Class name should be specified after option -c",
                         nextArgument);
                     className = nextArgument;
-                    break;
-                case "-r":
-                    validateOption("Repository name should be specified after option -r",
-                            nextArgument);
-                    repository = nextArgument;
                     break;
                 case "-t":
                     validateOption("Target method should be specified after option -t",
