@@ -1,7 +1,8 @@
 package com.od.TestSplitter.Samples;
 
 import org.junit.Test;
-
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -10,22 +11,23 @@ import static org.junit.Assert.assertTrue;
 public class BankAccountTest {
 
     @Test
-    public void testS0() { // system test given as input
-        BankAccount account = new BankAccount();
-        account.owner = "SampleOwner";
-        account.accountBalance = 0;
-        account.accountId = 1001;
-
-        account.addMoney(599);
-        account.addMoney(100);
-        account.withdrawMoney(100);
-        assertTrue(account.owner.equals("SampleOwner") && account.accountId == 1001
-                && account.accountBalance == 599);
-
-        account.withdrawMoney(100);
-        account.withdrawMoney(100);
-        assertTrue(account.owner.equals("SampleOwner") && account.accountId == 1001
-                && account.accountBalance == 399);
+    public void testS0() {
+        String a = "someString";
+        String b = a.hashCode() + "";
+        assertTrue(true);
+        String c = "Asd";
+        a = "another";
+        b = a.hashCode() + "";
+        assertNotEquals(a, b);
+        com.od.TestSplitter.Transformator.ObjectRecorder.writeObject("BankAccountTest_testS0", a, 2);
+        com.od.TestSplitter.Transformator.ObjectRecorder.writeObject("BankAccountTest_testS0", b, 2);
+        com.od.TestSplitter.Transformator.ObjectRecorder.finalizeWriting("BankAccountTest_testS0", 2);
+        String d = "xd";
+        a = "asdasd";
+        b = a;
+        assertEquals(a, b);
+        com.od.TestSplitter.Transformator.ObjectRecorder.writeObject("BankAccountTest_testS0", a, 3);
+        com.od.TestSplitter.Transformator.ObjectRecorder.writeObject("BankAccountTest_testS0", b, 3);
+        com.od.TestSplitter.Transformator.ObjectRecorder.finalizeWriting("BankAccountTest_testS0", 3);
     }
-
 }
