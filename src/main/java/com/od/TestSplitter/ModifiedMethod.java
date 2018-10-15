@@ -28,6 +28,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class ModifiedMethod {
 
@@ -36,7 +38,7 @@ public class ModifiedMethod {
     private Set<String> splitTargets;
     private List<Integer> splitIndexes;
     private String classAndMethodName;
-    private Map<String, String> variableMap;
+    private Map<Integer, Map<String,String>> variableIndexedMap;
     private Map<Integer, List<Expression>> expressions;
     private Map<String, String> fieldMap;
 
@@ -56,12 +58,12 @@ public class ModifiedMethod {
         return splitIndexes;
     }
 
-    public Map<String, String> getVariableMap() {
-        return variableMap;
+    public Map<String, String> getVariableMap(int index) {
+        return variableIndexedMap.get(index);
     }
 
     public void processGenerated(int index, List<String> list) {
-        int fileIndex = splitIndexes.indexOf(index) + 1;
+        int fileIndex = splitIndexes.indexOf(index);
         List<Expression> expList = new ArrayList<>(list.size() + fieldMap.size() + 1);
         List<String> list2 = new ArrayList<>(fieldMap.keySet());
         Collections.sort(list2);
@@ -110,7 +112,7 @@ public class ModifiedMethod {
      * @return map of generated methods.
      */
     Map<Integer, MethodDeclaration> generateMethods(int startingNumber) {
-        HashMap<Integer, MethodDeclaration> generatedMethods = new HashMap<>(splitIndexes.size());
+        Map<Integer, MethodDeclaration> generatedMethods = new TreeMap<>();
 
         BlockStmt block = new BlockStmt();
         for (int i = 0; i < statements.size(); i++) {
@@ -166,7 +168,11 @@ public class ModifiedMethod {
      * At the same time, the variable map ( variableName > type ) is generated.
      */
     private void fixEmptyDeclarationsAndGenerateVariableMap() {
-        variableMap = new HashMap<>();
+        HashMap<String,String> variableMap = new HashMap<>();
+        variableIndexedMap = new HashMap<>();
+        variableIndexedMap.put(splitIndexes.get(0),new HashMap<>());
+        // AtomicInteger is used to be able to increase it inside lambda func
+        AtomicInteger index = new AtomicInteger(0);
         statements.forEach(statement -> {
             if (statement instanceof ExpressionStmt &&
                 ((ExpressionStmt) statement).getExpression() instanceof VariableDeclarationExpr) {
@@ -184,6 +190,11 @@ public class ModifiedMethod {
                     }
                     variableMap.put(declarator.getNameAsString(), declarator.getType().toString());
                 }
+            }
+
+            int splitIndex = splitIndexes.indexOf(index.getAndIncrement());
+            if (splitIndex != -1 && splitIndex != splitIndexes.size() - 1) {
+                variableIndexedMap.put(splitIndexes.get(splitIndex + 1), new HashMap<>(variableMap));
             }
         });
     }
@@ -205,14 +216,16 @@ public class ModifiedMethod {
      */
     private boolean isSplitStatement(int index) {
         Statement statement = getStatement(index);
-        if (index == statements.size())
+        if (index == statements.size() - 1)
             return true;
 
         if (statement instanceof ExpressionStmt &&
             ((ExpressionStmt) statement).getExpression() instanceof MethodCallExpr) {
             String methodName = statement.toString();
             Statement nextStatement = getStatement(index + 1);
-            String nextStatementName = nextStatement == null ? "" : nextStatement.toString();
+            if (nextStatement == null || !(nextStatement instanceof ExpressionStmt))
+                return true;
+            String nextStatementName = ((ExpressionStmt) nextStatement).getExpression().toString();
             if (methodName.startsWith("assert") && TestParser.splitType == SplitType.ASSERTION &&
                 !nextStatementName.startsWith("assert")) {
                 return true;

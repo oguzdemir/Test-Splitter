@@ -110,7 +110,7 @@ public class TestParser {
     }
 
     public static void main(String[] args) throws Exception {
-
+        long start = System.currentTimeMillis();
         /**
          * Usage:
          * -p <Path to test source file>
@@ -272,5 +272,7 @@ public class TestParser {
             fileWriter.close();
         }
 
+        System.out.println("Instrumentation took: " + (System.currentTimeMillis() - start));
     }
+
 }

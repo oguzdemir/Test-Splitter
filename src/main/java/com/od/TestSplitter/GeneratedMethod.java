@@ -1,6 +1,7 @@
 package com.od.TestSplitter;
 
 import com.github.javaparser.JavaParser;
+import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.ArrayAccessExpr;
@@ -85,6 +86,9 @@ public class GeneratedMethod {
         });
     }
     public void addReadStatements() {
+        if (fileIndex == 0)
+            return;
+
         BlockStmt block = methodDeclaration.getBody().get();
         List<String> list = new ArrayList<>(neededVariablesTypes.keySet());
         Collections.sort(list, Collections.reverseOrder());
@@ -105,8 +109,7 @@ public class GeneratedMethod {
         HashMap<String, Integer> uses = new HashMap<>();
         HashMap<String, Integer> defs = new HashMap<>();
         for (int i = statements.size() - 1; i >= 0; i--) {
-            if (statements.get(i).isExpressionStmt())
-                processExpr(i, statements.get(i).asExpressionStmt().getExpression(), uses, defs);
+            processExpr(i, statements.get(i), uses, defs);
         }
         neededVariables = new ArrayList<>();
         uses.forEach((var, index) -> {
@@ -123,43 +126,37 @@ public class GeneratedMethod {
     }
 
 
-    void processExpr(int index, Expression expression,
+    void processExpr(int index, Node expression,
         HashMap<String, Integer> uses, HashMap<String, Integer> defs) {
         if (expression == null) {
             return;
         }
-        if (expression instanceof MethodCallExpr) {
-            if (((MethodCallExpr) expression).getScope().isPresent()) {
-                processExpr(index, ((MethodCallExpr) expression).getScope().get(), uses, defs);
-            }
-            for(Expression e: ((MethodCallExpr) expression).getArguments()) {
-                processExpr(index, e, uses, defs);
-            }
-        } else if (expression instanceof VariableDeclarationExpr) {
-            for (VariableDeclarator variableDeclarator: ((VariableDeclarationExpr) expression).getVariables()) {
-                // If there is a new definition, this variable should not be restored.
-                defs.put(variableDeclarator.getNameAsString(), -1);
-                processExpr(index, variableDeclarator.getInitializer().get(), uses, defs);
-            }
-        } else if (expression instanceof AssignExpr) {
-            Expression target = ((AssignExpr) expression).getTarget();
-            if (target instanceof FieldAccessExpr) {
-                processExpr(index, ((FieldAccessExpr) target).getScope(), uses, defs);
-            }
-            else if (target instanceof NameExpr) {
-                defs.put(((NameExpr) target).getNameAsString(), index);
-            } else if (target instanceof ArrayAccessExpr) {
-                processExpr(index, ((ArrayAccessExpr) ((AssignExpr) expression).getTarget()).getName(), uses, defs);
+        if (expression instanceof ExpressionStmt && ((ExpressionStmt) expression).isExpressionStmt()) {
+            Expression exp = ((ExpressionStmt) expression).getExpression();
+            if (exp instanceof VariableDeclarationExpr) {
+                for (VariableDeclarator variableDeclarator: ((VariableDeclarationExpr) exp).getVariables()) {
+                    // If there is a new definition, this variable should not be restored.
+                    defs.put(variableDeclarator.getNameAsString(), -1);
+                    processExpr(index, variableDeclarator.getInitializer().get(), uses, defs);
+                }
+            } else if (exp instanceof AssignExpr) {
+                processExpr(index, ((AssignExpr) exp).getValue(), uses, defs);
+                Expression target = ((AssignExpr) exp).getTarget();
+                if (target instanceof  NameExpr) {
+                    defs.put(((NameExpr) target).getNameAsString(), index);
+                } else {
+                    processExpr(index, target, uses, defs);
+                }
             } else {
-                System.err.println("Unknown assign expr.");
+                exp.findAll(NameExpr.class).forEach(u -> {
+                    uses.put(u.toString(), index);
+                });
             }
-        } else if (expression instanceof NameExpr){
-            uses.put(((NameExpr) expression).getNameAsString(), index);
-        } else if (expression instanceof BinaryExpr) {
-            processExpr(index, ((BinaryExpr) expression).getLeft(), uses, defs);
-            processExpr(index, ((BinaryExpr) expression).getRight(), uses, defs);
-        } else if (expression instanceof UnaryExpr) {
-            processExpr(index, ((UnaryExpr) expression).getExpression(), uses, defs);
+        }
+        else {
+            expression.findAll(NameExpr.class).forEach(u -> {
+                uses.put(u.toString(), index);
+            });
         }
     }
 
