@@ -70,6 +70,7 @@ public class ModifiedMethod {
         for (String field : list2) {
             expList.add(toWriteExpr(field, fileIndex, true));
         }
+        Collections.sort(list);
         for (String var: list) {
             expList.add(toWriteExpr(var, fileIndex, false));
         }

@@ -39,17 +39,23 @@ public class GeneratedMethod {
     private int fileIndex;
 
     public GeneratedMethod(MethodDeclaration methodDeclaration, String classAndMethodName,
-        Map<String, String> variableMap, int fileIndex, Map<String, String> fieldMap) {
+        Map<String, String> variableMap, int fileIndex, Map<String, String> fieldMap, boolean optimized) {
         this.methodDeclaration = methodDeclaration;
         statements = methodDeclaration.getBody().get().getStatements();
         this.classAndMethodName = classAndMethodName;
         this.fieldMap = fieldMap;
         this.fileIndex = fileIndex;
-        HashMap<String, Integer> defs = getVariableInformation();
-        this.neededVariablesTypes = new HashMap<>();
-        neededVariables.retainAll(variableMap.keySet());
-        neededVariables.forEach( v -> neededVariablesTypes.put(v, variableMap.get(v)));
-        fixDefinitions(defs, variableMap);
+
+        if (optimized) {
+            HashMap<String, Integer> defs = getVariableInformation();
+            this.neededVariablesTypes = new HashMap<>();
+            neededVariables.retainAll(variableMap.keySet());
+            neededVariables.forEach( v -> neededVariablesTypes.put(v, variableMap.get(v)));
+            fixDefinitions(defs, variableMap);
+        } else {
+            neededVariablesTypes = variableMap;
+            neededVariables = new ArrayList<>(variableMap.keySet());
+        }
     }
 
     public List<String> getNeededVariables() {

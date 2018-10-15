@@ -60,7 +60,7 @@ public class MethodVisitorForSplit extends VoidVisitorAdapter<Object> {
         // Creating method objects.
         count = 0;
         generatedMethods.forEach((i,m) -> {
-            generatedMethodsMap.put(i, new GeneratedMethod(m, classAndMethodName, modifiedMethod.getVariableMap(i), count++, fieldMap));
+            generatedMethodsMap.put(i, new GeneratedMethod(m, classAndMethodName, modifiedMethod.getVariableMap(i), count++, fieldMap,false));
             generatedMethodList.add(m);
         });
 
