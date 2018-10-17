@@ -51,7 +51,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import javafx.collections.transformation.SortedList;
 
 /**
  * This file extracts the statements for variable declarations and assertions in the test source via
@@ -242,7 +241,9 @@ public class TestParser {
             Collections.sort(generatedMethodList, new Comparator<MethodDeclaration>() {
                 @Override
                 public int compare(MethodDeclaration o1, MethodDeclaration o2) {
-                    return o1.getNameAsString().compareTo(o2.getNameAsString());
+                    Integer number1 = Integer.parseInt(o1.getNameAsString().replace("generatedU", ""));
+                    Integer number2 = Integer.parseInt(o2.getNameAsString().replace("generatedU", ""));
+                    return number1.compareTo(number2);
                 }
             });
 

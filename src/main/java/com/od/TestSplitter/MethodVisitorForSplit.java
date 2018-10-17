@@ -5,6 +5,7 @@ import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
 import com.github.javaparser.ast.expr.MarkerAnnotationExpr;
+import com.github.javaparser.ast.stmt.LocalClassDeclarationStmt;
 import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
 import com.od.TestSplitter.TestParser.TargetType;
 import java.util.ArrayList;
@@ -81,7 +82,8 @@ public class MethodVisitorForSplit extends VoidVisitorAdapter<Object> {
         boolean isTest =  method.getAnnotations().size() > 0
             && method.getAnnotations().contains(new MarkerAnnotationExpr("Test"));
 
-        return !isGenerated &&
+        boolean containsInnerClass = method.getBody().get().findAll(LocalClassDeclarationStmt.class).size() > 0;
+        return !isGenerated && !containsInnerClass &&
             isTest &&
             (TestParser.targetType == TargetType.ALL_METHODS
                 || targetNames.contains(method.getName().toString()));

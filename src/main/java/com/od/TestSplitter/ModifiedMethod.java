@@ -95,12 +95,12 @@ public class ModifiedMethod {
         BlockStmt blockStmt = new BlockStmt();
 
         for (int i = 0; i < statements.size(); i++) {
+            blockStmt.addStatement(statements.get(i));
             if (expressions.containsKey(i)) {
                 List<Expression> exps = expressions.get(i);
                 if (exps != null)
                     exps.forEach(exp-> blockStmt.addStatement(exp));
             }
-            blockStmt.addStatement(statements.get(i));
         }
 
         methodDeclaration.setBody(blockStmt);
@@ -224,9 +224,9 @@ public class ModifiedMethod {
             ((ExpressionStmt) statement).getExpression() instanceof MethodCallExpr) {
             String methodName = statement.toString();
             Statement nextStatement = getStatement(index + 1);
-            if (nextStatement == null || !(nextStatement instanceof ExpressionStmt))
-                return true;
-            String nextStatementName = ((ExpressionStmt) nextStatement).getExpression().toString();
+            String nextStatementName = "";
+            if (nextStatement instanceof ExpressionStmt)
+                nextStatementName = ((ExpressionStmt) nextStatement).getExpression().toString();
             if (methodName.startsWith("assert") && TestParser.splitType == SplitType.ASSERTION &&
                 !nextStatementName.startsWith("assert")) {
                 return true;
