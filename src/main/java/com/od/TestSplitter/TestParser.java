@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 /**
  * This file extracts the statements for variable declarations and assertions in the test source via
@@ -78,7 +79,7 @@ public class TestParser {
         }
     }
 
-    private static void findAllFiles(ArrayList<String> fileList, File file) {
+    private static void findAllFiles(List<String> fileList, File file) {
         File[] list = file.listFiles();
         if (list != null) {
             for (File fil : list) {
@@ -187,18 +188,13 @@ public class TestParser {
             targetType = TargetType.METHOD_NAME;
         }
 
-        ArrayList<String> allTestFiles = new ArrayList<>();
+        List<String> allTestFiles = new ArrayList<>();
+        findAllFiles(allTestFiles, new File(classPath));
         if (className == null) {
             System.out.println("Classpath:" + classPath);
-            findAllFiles(allTestFiles, new File(classPath));
         } else {
-            String fullPath = classPath + className + ".java";
-            File testFile = new File(fullPath);
-            if (testFile.exists() && !testFile.isDirectory()) {
-                allTestFiles.add(fullPath);
-            } else {
-                throw new IllegalArgumentException("Path: " + fullPath + " does not lead to a test class file.");
-            }
+            final String claz = className;
+            allTestFiles = allTestFiles.stream().filter(s -> s.contains(claz)).collect(Collectors.toList());
         }
         System.out.println("Arguments: " + Arrays.toString(args));
         System.out.println("Found test files:" + allTestFiles.size());
@@ -252,7 +248,6 @@ public class TestParser {
             }
             cls.setName(className);
             String newClassPath = classPath.substring(0, classPath.length() - 1) + "_splitted/";
-            //String newClassPath = classPath.replace("/commons-lang/", "/commons-lang_splitted/");
             writeClassToFile(cu, path.replaceFirst(classPath, newClassPath));
 
             className = null;
@@ -272,6 +267,7 @@ public class TestParser {
             }
             fileWriter.close();
         }
+
 
         System.out.println("Instrumentation took: " + (System.currentTimeMillis() - start));
     }
