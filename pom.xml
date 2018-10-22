@@ -22,7 +22,7 @@
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>
-                    <outputDirectory>../</outputDirectory>
+                    <outputDirectory>./jar/</outputDirectory>
                 </configuration>
                 <executions>
                     <execution>
