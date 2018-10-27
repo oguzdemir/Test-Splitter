@@ -212,6 +212,10 @@ public class TestParser {
             }
             testCount = 1;
 
+            if (!cu.getClassByName(className).isPresent()) {
+                continue;
+            }
+
             ClassOrInterfaceDeclaration cls = cu.getClassByName(className).get();
             if (cls.getModifiers().contains(Modifier.ABSTRACT) || !checkConcurrentImports(cu)) {
                 writeClassToFile(cu, path);
