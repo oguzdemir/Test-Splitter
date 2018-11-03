@@ -1,5 +1,6 @@
 package com.od.TestSplitter;
 
+import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
@@ -16,15 +17,21 @@ import java.util.Set;
 public class MethodVisitorForSplit extends VoidVisitorAdapter<Object> {
     private Set<String> targetNames;
     private Set<String> splitTargets;
-    private ClassOrInterfaceDeclaration cls;
     private Map<String, String> fieldMap;
     private int generationInd;
+    private int count;
+    ClassOrInterfaceDeclaration cls;
     ArrayList<MethodDeclaration> originalMethodList;
     ArrayList<MethodDeclaration> generatedMethodList;
-    private int count;
+    ArrayList<GeneratedMethod> allGeneratedMethods;
+    CompilationUnit cu;
+    String path;
 
-    public MethodVisitorForSplit(ClassOrInterfaceDeclaration cls, Set<String> targetNames,
+
+    public MethodVisitorForSplit(CompilationUnit cu,  String path, ClassOrInterfaceDeclaration cls,Set<String> targetNames,
         Set<String> splitTargets) {
+        this.cu = cu;
+        this.path = path;
         this.cls = cls;
         this.targetNames = targetNames;
         this.splitTargets = splitTargets;
@@ -32,6 +39,7 @@ public class MethodVisitorForSplit extends VoidVisitorAdapter<Object> {
         this.generationInd = 1;
         this.originalMethodList = new ArrayList<>();
         this.generatedMethodList = new ArrayList<>();
+        this.allGeneratedMethods = new ArrayList<>();
         this.count = 0;
     }
 
@@ -61,20 +69,25 @@ public class MethodVisitorForSplit extends VoidVisitorAdapter<Object> {
         // Creating method objects.
         count = 0;
         generatedMethods.forEach((i,m) -> {
-            generatedMethodsMap.put(i, new GeneratedMethod(m, classAndMethodName, modifiedMethod.getVariableMap(i), count++, fieldMap,false));
+            GeneratedMethod gm = new GeneratedMethod(m, classAndMethodName, modifiedMethod.getVariableMap(i), count++, fieldMap,false);
+            generatedMethodsMap.put(i, gm);
             generatedMethodList.add(m);
+            allGeneratedMethods.add(gm);
         });
 
         // Processing variables requirements for modified method (write statements)
         generatedMethodsMap.forEach((ind, m) -> {
             modifiedMethod.processGenerated(ind, m.getNeededVariables());
-            m.addReadStatements();
         });
 
         modifiedMethod.writeAllStatements();
 
         // TODO: Not sure about super
         super.visit(method, arg);
+    }
+
+    public void visitAll() {
+        allGeneratedMethods.forEach(GeneratedMethod::addReadStatements);
     }
 
     boolean checkTargetMethod(MethodDeclaration method) {

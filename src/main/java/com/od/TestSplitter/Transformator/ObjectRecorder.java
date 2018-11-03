@@ -16,7 +16,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.LinkedList;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -29,6 +29,7 @@ public class ObjectRecorder {
     }
 
     private static final String SNAPSHOT_URL = "./snapshots/";
+    public static final String SNAPSHOT_URL_COMBINATION = "./all_objects/";
     private static ObjectRecorder instance = new ObjectRecorder();
 
     public XStream xstream;
@@ -38,6 +39,8 @@ public class ObjectRecorder {
 
     // Object are firstly deserialized as list, then returned one at a time, mapped with user method
     private ConcurrentHashMap<String, LinkedList<Object>> readObjects;
+
+    private ConcurrentHashMap<String, Set<Object>> allObjects;
 
 
     private ObjectRecorder() {
@@ -50,11 +53,27 @@ public class ObjectRecorder {
 
         writtenObjects = new ConcurrentHashMap<>();
         readObjects = new ConcurrentHashMap<>();
+        allObjects = new ConcurrentHashMap<>();
 
         File file = new File(SNAPSHOT_URL);
         if (!file.exists()) {
             file.mkdirs();
         }
+
+        file = new File(SNAPSHOT_URL_COMBINATION);
+        if (!file.exists()) {
+            file.mkdirs();
+        }
+
+        Runtime.getRuntime().addShutdownHook(new Thread()
+        {
+            public void run()
+            {
+                System.err.println("Shutdown Hook is running for recording!");
+                ObjectRecorder.finalizeAll();
+                System.err.println("Application Terminating ...");
+            }
+        });
     }
 
     public static Converter getConverter(Class cls) {
@@ -69,6 +88,37 @@ public class ObjectRecorder {
         } else {
             writtenObjects.get(writePath).addLast(object);
         }
+
+        try {
+            String className = object.getClass().getCanonicalName();
+            if (object.getClass().toGenericString().contains("<"))
+                return;
+            if (allObjects.containsKey(className)) {
+                allObjects.get(className).add(object);
+            } else {
+                HashSet<Object> objects = new HashSet<>();
+                objects.add(object);
+                allObjects.put(className, objects);
+            }
+        } catch (Exception e) {
+
+        }
+    }
+
+    private void finalizeAllHelper() {
+        for (Map.Entry<String, Set<Object>> entry: allObjects.entrySet()) {
+            if (entry.getValue().size() < 2)
+                continue;
+            try {
+                FileWriter fw = new FileWriter(new File(SNAPSHOT_URL_COMBINATION + entry.getKey()) + ".xml");
+                xstream.toXML( new LinkedList<>(entry.getValue()), fw);
+                fw.flush();
+                fw.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
     }
 
     private void finalizeWritingHelper(String writePath) {
@@ -100,6 +150,19 @@ public class ObjectRecorder {
         return readObjects.get(readPath).removeFirst();
     }
 
+    private Object readSpecificObjectHelper(String readPath, int index) {
+        if (!readObjects.containsKey(readPath)) {
+            try {
+                LinkedList list = (LinkedList) xstream.fromXML(new File(readPath));
+                readObjects.put(readPath, list);
+            }
+            catch (Exception e) {
+                return null;
+            }
+        }
+        return readObjects.get(readPath).get(index);
+    }
+
     public static void writeObject(String classAndMethodName, Object object, int index) {
         instance.writeObjectHelper(SNAPSHOT_URL  + "out_" + classAndMethodName + "_" + index + ".xml", object);
     }
@@ -108,8 +171,21 @@ public class ObjectRecorder {
         instance.finalizeWritingHelper(SNAPSHOT_URL  + "out_" + classAndMethodName + "_" + index + ".xml");
     }
 
+    public static void finalizeAll() {
+        instance.finalizeAllHelper();
+    }
+
     public static Object readObject(String classAndMethodName, int index) {
         return instance.readObjectHelper(SNAPSHOT_URL  + "out_" + classAndMethodName + "_" + index + ".xml");
+    }
+
+    public static Object readSpecificObject(String className, int index) {
+        return instance.readSpecificObjectHelper(SNAPSHOT_URL_COMBINATION  + className + ".xml", index);
+    }
+
+    public static List<Object> readSpecificObjectAbsolute(String fullPath) {
+        instance.readSpecificObjectHelper(fullPath, 0);
+        return instance.readObjects.get(fullPath);
     }
 }
 

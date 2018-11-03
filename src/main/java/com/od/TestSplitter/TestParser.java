@@ -4,53 +4,15 @@ import com.github.javaparser.JavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.ImportDeclaration;
 import com.github.javaparser.ast.Modifier;
-import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
-import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
-import com.github.javaparser.ast.body.VariableDeclarator;
-import com.github.javaparser.ast.comments.LineComment;
-import com.github.javaparser.ast.expr.AnnotationExpr;
-import com.github.javaparser.ast.expr.AssignExpr;
-import com.github.javaparser.ast.expr.BinaryExpr;
-import com.github.javaparser.ast.expr.BooleanLiteralExpr;
-import com.github.javaparser.ast.expr.CastExpr;
-import com.github.javaparser.ast.expr.Expression;
-import com.github.javaparser.ast.expr.FieldAccessExpr;
-import com.github.javaparser.ast.expr.IntegerLiteralExpr;
-import com.github.javaparser.ast.expr.MarkerAnnotationExpr;
-import com.github.javaparser.ast.expr.MethodCallExpr;
-import com.github.javaparser.ast.expr.NameExpr;
-import com.github.javaparser.ast.expr.NullLiteralExpr;
-import com.github.javaparser.ast.expr.StringLiteralExpr;
-import com.github.javaparser.ast.expr.ThisExpr;
-import com.github.javaparser.ast.expr.UnaryExpr;
-import com.github.javaparser.ast.expr.VariableDeclarationExpr;
-import com.github.javaparser.ast.stmt.BlockStmt;
-import com.github.javaparser.ast.stmt.ExpressionStmt;
-import com.github.javaparser.ast.stmt.Statement;
-import com.github.javaparser.ast.type.PrimitiveType;
-import com.github.javaparser.ast.type.ReferenceType;
-import com.github.javaparser.ast.type.Type;
-import com.github.javaparser.ast.type.VoidType;
-import com.github.javaparser.ast.visitor.GenericListVisitorAdapter;
-import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
+import com.od.TestSplitter.Transformator.ObjectRecorder;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -79,14 +41,14 @@ public class TestParser {
         }
     }
 
-    private static void findAllFiles(List<String> fileList, File file) {
+    private static void findAllFiles(List<String> fileList, File file, String pattern) {
         File[] list = file.listFiles();
         if (list != null) {
             for (File fil : list) {
                 if (fil.isDirectory()) {
-                    findAllFiles(fileList, fil);
+                    findAllFiles(fileList, fil, pattern);
                 }
-                else if (fil.getName().contains("Test.java")) {
+                else if (fil.getName().contains(pattern)) {
                     fileList.add(fil.toString());
                 }
             }
@@ -189,7 +151,7 @@ public class TestParser {
         }
 
         List<String> allTestFiles = new ArrayList<>();
-        findAllFiles(allTestFiles, new File(classPath));
+        findAllFiles(allTestFiles, new File(classPath), "Test.java");
         if (className == null) {
             System.out.println("Classpath:" + classPath);
         } else {
@@ -200,7 +162,11 @@ public class TestParser {
         System.out.println("Found test files:" + allTestFiles.size());
         ArrayList<String> existingClasses = new ArrayList<>();
         ArrayList<String> generatedClasses = new ArrayList<>();
+
+
         int testCount = 1;
+
+        ArrayList<MethodVisitorForSplit> visitors = new ArrayList<>();
         for (String path : allTestFiles) {
             CompilationUnit cu = JavaParser.parse(new FileInputStream(new File(path)));
             if (className == null) {
@@ -224,11 +190,29 @@ public class TestParser {
                 className = null;
                 continue;
             }
-            MethodVisitorForSplit visitor = new MethodVisitorForSplit(cls,targetNames, splitNames);
+            MethodVisitorForSplit visitor = new MethodVisitorForSplit(cu, path, cls, targetNames, splitNames);
+            visitors.add(visitor);
             cu.accept(visitor, null);
+            writeClassToFile(cu, path);
+            className = null;
+        }
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("Press enter to continue execution after generating object files:");
+        scanner.next();
+        List<String> allObjectFiles = new ArrayList<>();
+        findAllFiles(allObjectFiles, new File(classPath + ObjectRecorder.SNAPSHOT_URL_COMBINATION), ".xml");
+        HashMap<String,String> foundObjects = new HashMap<>();
+        allObjectFiles.forEach(path-> {
+            foundObjects.put(path.substring(path.lastIndexOf("/") + 1, path.lastIndexOf(".")), path);
+        });
+
+        for(MethodVisitorForSplit visitor: visitors) {
+            ClassOrInterfaceDeclaration cls = visitor.cls;
+            String path = visitor.path;
+            CompilationUnit cu = visitor.cu;
+            visitor.visitAll();
             List<MethodDeclaration> originalMethodList = visitor.originalMethodList;
             List<MethodDeclaration> generatedMethodList = visitor.generatedMethodList;
-            writeClassToFile(cu, path);
 
             for (MethodDeclaration methodDeclaration: cls.getMethods()) {
                 cls.remove(methodDeclaration);
@@ -250,13 +234,12 @@ public class TestParser {
             for (MethodDeclaration m : generatedMethodList) {
                 cls.addMember(m);
             }
-            cls.setName(className);
+            //cls.setName(className);
             String newClassPath = classPath.substring(0, classPath.length() - 1) + "_splitted/";
             writeClassToFile(cu, path.replaceFirst(classPath, newClassPath));
 
-            className = null;
             if (record) {
-                existingClasses.add(className);
+                //existingClasses.add(className);
             }
         }
         if (record) {
