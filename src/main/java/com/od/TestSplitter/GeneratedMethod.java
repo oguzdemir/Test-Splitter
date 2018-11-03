@@ -91,6 +91,38 @@ public class GeneratedMethod {
             }
         });
     }
+
+
+    public void addReadStatements(HashMap<String, String> map) {
+        if (fileIndex == 0)
+            return;
+
+        System.out.println();
+        for (Map.Entry<String, String> entry : neededVariablesTypes.entrySet()) {
+            HashMap typeMap = (HashMap) TestParser.typeMap.get(classAndMethodName);
+            String fullName = (String) typeMap.get(entry.getValue());
+            if (map.containsKey(fullName)) {
+                // TODO:
+                System.out.println("x");
+            }
+        }
+
+        BlockStmt block = methodDeclaration.getBody().get();
+        List<String> list = new ArrayList<>(neededVariablesTypes.keySet());
+        Collections.sort(list, Collections.reverseOrder());
+        for (String variableName: list) {
+            Expression readExpr = toReadExpr(variableName, neededVariablesTypes.get(variableName), fileIndex, false);
+            block.addStatement(0, readExpr);
+        }
+
+        list = new ArrayList<>(fieldMap.keySet());
+        Collections.sort(list, Collections.reverseOrder());
+        for (String variableName: list) {
+            Expression readExpr = toReadExpr(variableName, fieldMap.get(variableName), fileIndex, true);
+            block.addStatement(0, readExpr);
+        }
+    }
+
     public void addReadStatements() {
         if (fileIndex == 0)
             return;

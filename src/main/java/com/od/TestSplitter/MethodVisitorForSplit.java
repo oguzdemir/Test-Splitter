@@ -86,8 +86,10 @@ public class MethodVisitorForSplit extends VoidVisitorAdapter<Object> {
         super.visit(method, arg);
     }
 
-    public void visitAll() {
-        allGeneratedMethods.forEach(GeneratedMethod::addReadStatements);
+    public void visitAll(HashMap<String, String> map) {
+        allGeneratedMethods.forEach(m -> {
+            m.addReadStatements(map);
+        });
     }
 
     boolean checkTargetMethod(MethodDeclaration method) {

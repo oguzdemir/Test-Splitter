@@ -13,6 +13,7 @@ import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
 public class TestParser {
     static TargetType targetType;
     static SplitType splitType;
+    static ConcurrentHashMap typeMap;
 
     enum TargetType {
         ALL_METHODS, METHOD_NAME
@@ -206,11 +208,12 @@ public class TestParser {
             foundObjects.put(path.substring(path.lastIndexOf("/") + 1, path.lastIndexOf(".")), path);
         });
 
+        typeMap = ObjectRecorder.readTypeMap(classPath);
         for(MethodVisitorForSplit visitor: visitors) {
             ClassOrInterfaceDeclaration cls = visitor.cls;
             String path = visitor.path;
             CompilationUnit cu = visitor.cu;
-            visitor.visitAll();
+            visitor.visitAll(foundObjects);
             List<MethodDeclaration> originalMethodList = visitor.originalMethodList;
             List<MethodDeclaration> generatedMethodList = visitor.generatedMethodList;
 

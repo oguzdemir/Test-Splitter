@@ -42,6 +42,7 @@ public class ObjectRecorder {
 
     private ConcurrentHashMap<String, Set<Object>> allObjects;
 
+    private ConcurrentHashMap<String, HashMap<String,String>> typeMap;
 
     private ObjectRecorder() {
         SplitterJavaReflectionProvider splitterJavaReflectionProvider = new SplitterJavaReflectionProvider();
@@ -54,6 +55,7 @@ public class ObjectRecorder {
         writtenObjects = new ConcurrentHashMap<>();
         readObjects = new ConcurrentHashMap<>();
         allObjects = new ConcurrentHashMap<>();
+        typeMap = new ConcurrentHashMap<>();
 
         File file = new File(SNAPSHOT_URL);
         if (!file.exists()) {
@@ -92,6 +94,11 @@ public class ObjectRecorder {
 
         try {
             String className = object.getClass().getCanonicalName();
+            if (!typeMap.containsKey(classAndMethodName))
+                typeMap.put(classAndMethodName, new HashMap<>());
+
+            typeMap.get(classAndMethodName).put(object.getClass().getSimpleName(), className);
+
             if (object.getClass().toGenericString().contains("<"))
                 return;
             if (allObjects.containsKey(className)) {
@@ -118,6 +125,15 @@ public class ObjectRecorder {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+        }
+
+        try {
+            FileWriter fw = new FileWriter(new File(SNAPSHOT_URL_COMBINATION + "typeMap" + ".xml"));
+            xstream.toXML( typeMap, fw);
+            fw.flush();
+            fw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
 
     }
@@ -190,6 +206,10 @@ public class ObjectRecorder {
     public static List<Object> readSpecificObjectAbsolute(String fullPath) {
         instance.readSpecificObjectHelper(fullPath, 0);
         return instance.readObjects.get(fullPath);
+    }
+
+    public static ConcurrentHashMap readTypeMap(String path) {
+        return (ConcurrentHashMap) instance.xstream.fromXML(new File(path + SNAPSHOT_URL_COMBINATION + "typeMap" + ".xml"));
     }
 }
 
