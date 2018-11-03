@@ -80,7 +80,8 @@ public class ObjectRecorder {
         return instance.xstream.getConverterLookup().lookupConverterForType(cls);
     }
 
-    private void writeObjectHelper(String writePath, Object object) {
+    private void writeObjectHelper(String classAndMethodName, Object object, int index) {
+        String writePath = SNAPSHOT_URL  + "out_" + classAndMethodName + "_" + index + ".xml";
         if (!writtenObjects.containsKey(writePath)) {
             LinkedList<Object> objects = new LinkedList<>();
             objects.add(object);
@@ -121,7 +122,8 @@ public class ObjectRecorder {
 
     }
 
-    private void finalizeWritingHelper(String writePath) {
+    private void finalizeWritingHelper(String classAndMethodName, int index) {
+        String writePath = SNAPSHOT_URL  + "out_" + classAndMethodName + "_" + index + ".xml";
         if (writtenObjects.containsKey(writePath)) {
             try {
                 FileWriter fw = new FileWriter(
@@ -136,7 +138,8 @@ public class ObjectRecorder {
 
     }
 
-    private Object readObjectHelper(String readPath) {
+    private Object readObjectHelper(String classAndMethodName, int index) {
+        String readPath = SNAPSHOT_URL  + "out_" + classAndMethodName + "_" + index + ".xml";
         if (!readObjects.containsKey(readPath)) {
             try {
                 LinkedList list = (LinkedList) xstream.fromXML(new File(readPath));
@@ -150,7 +153,8 @@ public class ObjectRecorder {
         return readObjects.get(readPath).removeFirst();
     }
 
-    private Object readSpecificObjectHelper(String readPath, int index) {
+    private Object readSpecificObjectHelper(String className, int index) {
+        String readPath = SNAPSHOT_URL_COMBINATION  + className + ".xml";
         if (!readObjects.containsKey(readPath)) {
             try {
                 LinkedList list = (LinkedList) xstream.fromXML(new File(readPath));
@@ -164,11 +168,11 @@ public class ObjectRecorder {
     }
 
     public static void writeObject(String classAndMethodName, Object object, int index) {
-        instance.writeObjectHelper(SNAPSHOT_URL  + "out_" + classAndMethodName + "_" + index + ".xml", object);
+        instance.writeObjectHelper(classAndMethodName, object, index);
     }
 
     public static void finalizeWriting(String classAndMethodName, int index) {
-        instance.finalizeWritingHelper(SNAPSHOT_URL  + "out_" + classAndMethodName + "_" + index + ".xml");
+        instance.finalizeWritingHelper(classAndMethodName, index);
     }
 
     public static void finalizeAll() {
@@ -176,11 +180,11 @@ public class ObjectRecorder {
     }
 
     public static Object readObject(String classAndMethodName, int index) {
-        return instance.readObjectHelper(SNAPSHOT_URL  + "out_" + classAndMethodName + "_" + index + ".xml");
+        return instance.readObjectHelper(classAndMethodName, index);
     }
 
     public static Object readSpecificObject(String className, int index) {
-        return instance.readSpecificObjectHelper(SNAPSHOT_URL_COMBINATION  + className + ".xml", index);
+        return instance.readSpecificObjectHelper(className, index);
     }
 
     public static List<Object> readSpecificObjectAbsolute(String fullPath) {
