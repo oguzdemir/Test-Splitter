@@ -27,6 +27,7 @@ public class TestParser {
     static TargetType targetType;
     static SplitType splitType;
     static ConcurrentHashMap typeMap;
+    public static String repoPath;
 
     enum TargetType {
         ALL_METHODS, METHOD_NAME
@@ -151,6 +152,8 @@ public class TestParser {
         if (targetNames.size() > 0) {
             targetType = TargetType.METHOD_NAME;
         }
+
+        repoPath = classPath;
 
         List<String> allTestFiles = new ArrayList<>();
         findAllFiles(allTestFiles, new File(classPath), "Test.java");

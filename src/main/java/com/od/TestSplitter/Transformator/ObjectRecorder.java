@@ -1,5 +1,6 @@
 package com.od.TestSplitter.Transformator;
 
+import com.od.TestSplitter.TestParser;
 import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.converters.Converter;
 import com.thoughtworks.xstream.converters.MarshallingContext;
@@ -10,10 +11,12 @@ import com.thoughtworks.xstream.converters.reflection.ReflectionProvider;
 import com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider;
 import com.thoughtworks.xstream.io.HierarchicalStreamWriter;
 import com.thoughtworks.xstream.mapper.Mapper;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.Serializable;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.*;
@@ -156,7 +159,7 @@ public class ObjectRecorder {
 
     private Object readObjectHelper(String classAndMethodName, int index) {
         String readPath = SNAPSHOT_URL  + "out_" + classAndMethodName + "_" + index + ".xml";
-        if (!readObjects.containsKey(readPath)) {
+        if (!readObjects.containsKey(readPath) || readObjects.get(readPath).size() == 0) {
             try {
                 LinkedList list = (LinkedList) xstream.fromXML(new File(readPath));
                 readObjects.put(readPath, list);
@@ -177,6 +180,7 @@ public class ObjectRecorder {
                 readObjects.put(readPath, list);
             }
             catch (Exception e) {
+                e.printStackTrace();
                 return null;
             }
         }
@@ -203,9 +207,22 @@ public class ObjectRecorder {
         return instance.readSpecificObjectHelper(className, index);
     }
 
-    public static List<Object> readSpecificObjectAbsolute(String fullPath) {
-        instance.readSpecificObjectHelper(fullPath, 0);
-        return instance.readObjects.get(fullPath);
+    public static int readSpecificObjectCount(String className) {
+        Document doc;
+        int count = 0;
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            doc = builder.parse(TestParser.repoPath + SNAPSHOT_URL_COMBINATION + className + ".xml");
+            for(int i = 0; i < doc.getChildNodes().item(0).getChildNodes().getLength(); i++) {
+                if (!doc.getChildNodes().item(0).getChildNodes().item(i).getNodeName().equals("#text")) {
+                    count++;
+                }
+            }
+        } catch (Exception e) {
+        }
+
+        return count;
     }
 
     public static ConcurrentHashMap readTypeMap(String path) {

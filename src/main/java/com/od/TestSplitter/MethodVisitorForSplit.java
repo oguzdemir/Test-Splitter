@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class MethodVisitorForSplit extends VoidVisitorAdapter<Object> {
     private Set<String> targetNames;
@@ -26,7 +27,7 @@ public class MethodVisitorForSplit extends VoidVisitorAdapter<Object> {
     ArrayList<GeneratedMethod> allGeneratedMethods;
     CompilationUnit cu;
     String path;
-
+    public int methodCounter;
 
     public MethodVisitorForSplit(CompilationUnit cu,  String path, ClassOrInterfaceDeclaration cls,Set<String> targetNames,
         Set<String> splitTargets) {
@@ -81,15 +82,19 @@ public class MethodVisitorForSplit extends VoidVisitorAdapter<Object> {
         });
 
         modifiedMethod.writeAllStatements();
-
+        methodCounter += generatedMethodList.size();
         // TODO: Not sure about super
         super.visit(method, arg);
     }
 
     public void visitAll(HashMap<String, String> map) {
         allGeneratedMethods.forEach(m -> {
-            m.addReadStatements(map);
+            m.addReadStatements(map, this);
         });
+    }
+
+    public void addGeneratedMethod(GeneratedMethod gm) {
+        generatedMethodList.add(gm.getMethodDeclaration());
     }
 
     boolean checkTargetMethod(MethodDeclaration method) {

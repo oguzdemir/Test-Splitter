@@ -22,12 +22,9 @@ import com.github.javaparser.ast.stmt.ExpressionStmt;
 import com.github.javaparser.ast.stmt.Statement;
 import com.github.javaparser.ast.type.PrimitiveType;
 import com.github.javaparser.ast.type.Type;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import com.od.TestSplitter.Transformator.ObjectRecorder;
+
+import java.util.*;
 
 public class GeneratedMethod {
     private MethodDeclaration methodDeclaration;
@@ -56,6 +53,22 @@ public class GeneratedMethod {
             neededVariablesTypes = variableMap;
             neededVariables = new ArrayList<>(variableMap.keySet());
         }
+    }
+
+    public GeneratedMethod(MethodDeclaration methodDeclaration, List<String> neededVariables,
+                           String classAndMethodName, Map<String, String> neededVariablesTypes,
+                           Map<String, String> fieldMap, int fileIndex, int randomReadIndex, String targetVariable, String fullClassName) {
+        this.methodDeclaration = methodDeclaration;
+        statements = methodDeclaration.getBody().get().getStatements();
+        this.neededVariables = neededVariables;
+        this.classAndMethodName = classAndMethodName;
+        this.neededVariablesTypes = neededVariablesTypes;
+        this.fieldMap = fieldMap;
+        this.fileIndex = fileIndex;
+
+        BlockStmt block = methodDeclaration.getBody().get();
+        Expression readExp = toSpecificReadExpr(targetVariable, neededVariablesTypes.get(targetVariable), fullClassName, randomReadIndex);
+        block.addStatement(0, readExp);
     }
 
     public List<String> getNeededVariables() {
@@ -92,18 +105,33 @@ public class GeneratedMethod {
         });
     }
 
+    private void customCloneAndAdd(String fullClassName, String variableName, MethodVisitorForSplit visitor) {
+        int size = ObjectRecorder.readSpecificObjectCount(fullClassName);
+        if (size < 2) {
+            return;
+        }
+        int newMethodIndex = ++visitor.methodCounter;
+        int randomIndex = new Random().nextInt(size);
+        GeneratedMethod gm = new GeneratedMethod(methodDeclaration.clone(), neededVariables, classAndMethodName,
+                neededVariablesTypes, fieldMap, fileIndex, randomIndex, variableName, fullClassName);
+        gm.methodDeclaration.setName("generatedU" + newMethodIndex);
+        gm.addReadStatements();
 
-    public void addReadStatements(HashMap<String, String> map) {
+        visitor.addGeneratedMethod(gm);
+
+
+    }
+
+    public void addReadStatements(HashMap<String, String> map, MethodVisitorForSplit visitor) {
         if (fileIndex == 0)
             return;
 
-        System.out.println();
         for (Map.Entry<String, String> entry : neededVariablesTypes.entrySet()) {
             HashMap typeMap = (HashMap) TestParser.typeMap.get(classAndMethodName);
             String fullName = (String) typeMap.get(entry.getValue());
             if (map.containsKey(fullName)) {
                 // TODO:
-                System.out.println("x");
+                customCloneAndAdd(fullName, entry.getKey(), visitor);
             }
         }
 
@@ -229,4 +257,22 @@ public class GeneratedMethod {
         }
     }
 
+    private Expression toSpecificReadExpr(String variableName, String typeName, String fullClassName, int index) {
+        Type type = JavaParser.parseType(typeName);
+        Type castType = type;
+        if (type.isPrimitiveType()) {
+            castType = ((PrimitiveType) type).toBoxedType();
+        }
+        NameExpr clazz = new NameExpr("com.od.TestSplitter.Transformator.ObjectRecorder");
+        MethodCallExpr call = new MethodCallExpr(clazz, "readSpecificObject");
+        call.addArgument(new StringLiteralExpr(fullClassName));
+        call.addArgument(new IntegerLiteralExpr(index));
+        CastExpr castExpr = new CastExpr(castType, call);
+
+        return new AssignExpr(new NameExpr(variableName), castExpr, AssignExpr.Operator.ASSIGN);
+    }
+
+    public MethodDeclaration getMethodDeclaration() {
+        return methodDeclaration;
+    }
 }
