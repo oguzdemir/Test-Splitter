@@ -1,0 +1,11 @@
+<concurrent-hash-map>
+  <entry>
+    <string>NumberTest_testMin</string>
+    <map>
+      <entry>
+        <string>Integer</string>
+        <string>java.lang.Integer</string>
+      </entry>
+    </map>
+  </entry>
+</concurrent-hash-map>
