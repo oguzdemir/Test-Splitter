@@ -24,6 +24,7 @@ import com.github.javaparser.ast.type.PrimitiveType;
 import com.github.javaparser.ast.type.Type;
 import com.od.TestSplitter.Transformator.ObjectRecorder;
 
+import com.sun.tools.javah.Gen;
 import java.util.*;
 
 public class GeneratedMethod {
@@ -57,7 +58,7 @@ public class GeneratedMethod {
 
     public GeneratedMethod(MethodDeclaration methodDeclaration, List<String> neededVariables,
                            String classAndMethodName, Map<String, String> neededVariablesTypes,
-                           Map<String, String> fieldMap, int fileIndex, int randomReadIndex, String targetVariable, String fullClassName) {
+                           Map<String, String> fieldMap, int fileIndex, List<Expression> newStatements) {
         this.methodDeclaration = methodDeclaration;
         statements = methodDeclaration.getBody().get().getStatements();
         this.neededVariables = neededVariables;
@@ -67,8 +68,10 @@ public class GeneratedMethod {
         this.fileIndex = fileIndex;
 
         BlockStmt block = methodDeclaration.getBody().get();
-        Expression readExp = toSpecificReadExpr(targetVariable, neededVariablesTypes.get(targetVariable), fullClassName, randomReadIndex);
-        block.addStatement(0, readExp);
+        for(Expression s: newStatements) {
+            block.addStatement(0, s);
+        }
+
     }
 
     public List<String> getNeededVariables() {
@@ -105,35 +108,75 @@ public class GeneratedMethod {
         });
     }
 
-    private void customCloneAndAdd(String fullClassName, String variableName, MethodVisitorForSplit visitor) {
-        int size = ObjectRecorder.readSpecificObjectCount(fullClassName);
-        if (size < 2) {
-            return;
+    private void addAllCombinations(MethodVisitorForSplit visitor, List<GeneratedMethod> methods) {
+        for (GeneratedMethod gm: methods) {
+            int newMethodIndex = ++visitor.methodCounter;
+            gm.methodDeclaration.setName("generatedU" + newMethodIndex);
+            visitor.addGeneratedMethod(gm);
         }
-        int newMethodIndex = ++visitor.methodCounter;
-        int randomIndex = new Random().nextInt(size);
+    }
+
+    private GeneratedMethod createCombination(List<Expression> expressions) {
         GeneratedMethod gm = new GeneratedMethod(methodDeclaration.clone(), neededVariables, classAndMethodName,
-                neededVariablesTypes, fieldMap, fileIndex, randomIndex, variableName, fullClassName);
-        gm.methodDeclaration.setName("generatedU" + newMethodIndex);
+            neededVariablesTypes, fieldMap, fileIndex, expressions);
         gm.addReadStatements();
+        return gm;
+    }
 
-        visitor.addGeneratedMethod(gm);
+    private List<GeneratedMethod> processCombinations(List<String> variableNames, List<String> shortTypeNames,List<String> fullTypeNames) {
 
+        List<GeneratedMethod> allCombinations = new ArrayList<>();
+        for (int i = 0 ; i < variableNames.size(); i++) {
+            // Single combination with all possible values
+            int options1 = ObjectRecorder.readSpecificObjectCount(fullTypeNames.get(i));
 
+            for (int iOptions = 0; iOptions < options1; iOptions++) {
+                List<Expression> statements = new ArrayList<>(2);
+                statements.add(toSpecificReadExpr(variableNames.get(i), shortTypeNames.get(i), fullTypeNames.get(i), iOptions));
+                allCombinations.add(createCombination(statements));
+                for (int j = i+1; j < variableNames.size(); j++) {
+                    // Pairwise combination
+                    int options2 = ObjectRecorder.readSpecificObjectCount(fullTypeNames.get(j));
+                    for (int jOptions = 0; jOptions < options2; jOptions++) {
+                        statements.add(toSpecificReadExpr(variableNames.get(j), shortTypeNames.get(j), fullTypeNames.get(j), jOptions));
+                        allCombinations.add(createCombination(statements));
+                        statements.remove(1);
+                    }
+                }
+            }
+        }
+
+        return allCombinations;
     }
 
     public void addReadStatements(HashMap<String, String> map, MethodVisitorForSplit visitor) {
         if (fileIndex == 0)
             return;
 
+        List<String> variableNames = new ArrayList<>();
+        List<String> shortTypeNames = new ArrayList<>();
+        List<String> fullTypeNames = new ArrayList<>();
         for (Map.Entry<String, String> entry : neededVariablesTypes.entrySet()) {
             HashMap typeMap = (HashMap) TestParser.typeMap.get(classAndMethodName);
-            String fullName = (String) typeMap.get(entry.getValue());
-            if (map.containsKey(fullName)) {
-                // TODO:
-                customCloneAndAdd(fullName, entry.getKey(), visitor);
+            String variableName = entry.getKey();
+            String shortTypeName = entry.getValue();
+            Type type = JavaParser.parseType(shortTypeName);
+            if (type.isPrimitiveType()) {
+                shortTypeName = ((PrimitiveType) type).toBoxedType().toString();
+            }
+            String fullTypeName = (String) typeMap.get(shortTypeName);
+            if (map.containsKey(fullTypeName)) {
+                if (ObjectRecorder.readSpecificObjectCount(fullTypeName) < 2) {
+                    continue;
+                }
+                variableNames.add(variableName);
+                shortTypeNames.add(shortTypeName);
+                fullTypeNames.add(fullTypeName);
             }
         }
+        List<GeneratedMethod> combinations = processCombinations(variableNames, shortTypeNames, fullTypeNames);
+        addAllCombinations(visitor, combinations);
+
 
         BlockStmt block = methodDeclaration.getBody().get();
         List<String> list = new ArrayList<>(neededVariablesTypes.keySet());
