@@ -63,12 +63,14 @@ public class GeneratedMethod {
         statements = methodDeclaration.getBody().get().getStatements();
         this.neededVariables = neededVariables;
         this.classAndMethodName = classAndMethodName;
-        this.neededVariablesTypes = neededVariablesTypes;
+        this.neededVariablesTypes = new HashMap<>(neededVariablesTypes);
         this.fieldMap = fieldMap;
         this.fileIndex = fileIndex;
 
+
         BlockStmt block = methodDeclaration.getBody().get();
         for(Expression s: newStatements) {
+            this.neededVariablesTypes.remove(((VariableDeclarationExpr) s).getVariable(0).getNameAsString());
             block.addStatement(0, s);
         }
 
@@ -161,10 +163,11 @@ public class GeneratedMethod {
             String variableName = entry.getKey();
             String shortTypeName = entry.getValue();
             Type type = JavaParser.parseType(shortTypeName);
+            String boxedTypeName = shortTypeName;
             if (type.isPrimitiveType()) {
-                shortTypeName = ((PrimitiveType) type).toBoxedType().toString();
+                boxedTypeName = ((PrimitiveType) type).toBoxedType().toString();
             }
-            String fullTypeName = (String) typeMap.get(shortTypeName);
+            String fullTypeName = (String) typeMap.get(boxedTypeName);
             if (map.containsKey(fullTypeName)) {
                 if (ObjectRecorder.readSpecificObjectCount(fullTypeName) < 2) {
                     continue;
@@ -311,8 +314,9 @@ public class GeneratedMethod {
         call.addArgument(new StringLiteralExpr(fullClassName));
         call.addArgument(new IntegerLiteralExpr(index));
         CastExpr castExpr = new CastExpr(castType, call);
-
-        return new AssignExpr(new NameExpr(variableName), castExpr, AssignExpr.Operator.ASSIGN);
+        VariableDeclarator declarator = new VariableDeclarator(type, variableName,
+            castExpr);
+        return new VariableDeclarationExpr(declarator);
     }
 
     public MethodDeclaration getMethodDeclaration() {
