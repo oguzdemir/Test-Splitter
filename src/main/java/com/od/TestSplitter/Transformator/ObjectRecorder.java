@@ -157,7 +157,7 @@ public class ObjectRecorder {
 
     }
 
-    private Object readObjectHelper(String classAndMethodName, int index) {
+    private Object readObjectHelper(String classAndMethodName, int index, int readIndex) {
         String readPath = SNAPSHOT_URL  + "out_" + classAndMethodName + "_" + index + ".xml";
         if (!readObjects.containsKey(readPath) || readObjects.get(readPath).size() == 0) {
             try {
@@ -169,7 +169,7 @@ public class ObjectRecorder {
                 return null;
             }
         }
-        return readObjects.get(readPath).removeFirst();
+        return readObjects.get(readPath).get(readIndex);
     }
 
     private Object readSpecificObjectHelper(String className, int index) {
@@ -199,8 +199,8 @@ public class ObjectRecorder {
         instance.finalizeAllHelper();
     }
 
-    public static Object readObject(String classAndMethodName, int index) {
-        return instance.readObjectHelper(classAndMethodName, index);
+    public static Object readObject(String classAndMethodName, int index, int readIndex) {
+        return instance.readObjectHelper(classAndMethodName, index, readIndex);
     }
 
     public static Object readSpecificObject(String className, int index) {

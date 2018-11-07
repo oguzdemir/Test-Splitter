@@ -24,7 +24,6 @@ import com.github.javaparser.ast.type.PrimitiveType;
 import com.github.javaparser.ast.type.Type;
 import com.od.TestSplitter.Transformator.ObjectRecorder;
 
-import com.sun.tools.javah.Gen;
 import java.util.*;
 
 public class GeneratedMethod {
@@ -70,7 +69,7 @@ public class GeneratedMethod {
 
         BlockStmt block = methodDeclaration.getBody().get();
         for(Expression s: newStatements) {
-            this.neededVariablesTypes.remove(((VariableDeclarationExpr) s).getVariable(0).getNameAsString());
+            this.neededVariablesTypes.put(((VariableDeclarationExpr) s).getVariable(0).getNameAsString(), "");
             block.addStatement(0, s);
         }
 
@@ -184,15 +183,20 @@ public class GeneratedMethod {
         BlockStmt block = methodDeclaration.getBody().get();
         List<String> list = new ArrayList<>(neededVariablesTypes.keySet());
         Collections.sort(list, Collections.reverseOrder());
+        int readIndex = list.size() + fieldMap.size() - 1;
         for (String variableName: list) {
-            Expression readExpr = toReadExpr(variableName, neededVariablesTypes.get(variableName), fileIndex, false);
-            block.addStatement(0, readExpr);
+            String typeName = neededVariablesTypes.get(variableName);
+            if (!typeName.equals("")) {
+                Expression readExpr = toReadExpr(variableName, neededVariablesTypes.get(variableName), fileIndex, false, readIndex);
+                block.addStatement(0, readExpr);
+            }
+            readIndex--;
         }
 
         list = new ArrayList<>(fieldMap.keySet());
         Collections.sort(list, Collections.reverseOrder());
         for (String variableName: list) {
-            Expression readExpr = toReadExpr(variableName, fieldMap.get(variableName), fileIndex, true);
+            Expression readExpr = toReadExpr(variableName, fieldMap.get(variableName), fileIndex, true, readIndex--);
             block.addStatement(0, readExpr);
         }
     }
@@ -204,15 +208,20 @@ public class GeneratedMethod {
         BlockStmt block = methodDeclaration.getBody().get();
         List<String> list = new ArrayList<>(neededVariablesTypes.keySet());
         Collections.sort(list, Collections.reverseOrder());
+        int readIndex = list.size() + fieldMap.size() - 1;
         for (String variableName: list) {
-            Expression readExpr = toReadExpr(variableName, neededVariablesTypes.get(variableName), fileIndex, false);
-            block.addStatement(0, readExpr);
+            String typeName = neededVariablesTypes.get(variableName);
+            if (!typeName.equals("")) {
+                Expression readExpr = toReadExpr(variableName, neededVariablesTypes.get(variableName), fileIndex, false, readIndex);
+                block.addStatement(0, readExpr);
+            }
+            readIndex = readIndex - 1;
         }
 
         list = new ArrayList<>(fieldMap.keySet());
         Collections.sort(list, Collections.reverseOrder());
         for (String variableName: list) {
-            Expression readExpr = toReadExpr(variableName, fieldMap.get(variableName), fileIndex, true);
+            Expression readExpr = toReadExpr(variableName, fieldMap.get(variableName), fileIndex, true, readIndex--);
             block.addStatement(0, readExpr);
         }
     }
@@ -282,7 +291,7 @@ public class GeneratedMethod {
      *               will be `this.fieldName = readExpr`;
      * @return Corresponding read expression
      */
-    private Expression toReadExpr(String variableName, String typeName, int index, boolean isThis) {
+    private Expression toReadExpr(String variableName, String typeName, int index, boolean isThis, int readIndex) {
         Type type = JavaParser.parseType(typeName);
         Type castType = type;
         if (type.isPrimitiveType()) {
@@ -292,6 +301,7 @@ public class GeneratedMethod {
         MethodCallExpr call = new MethodCallExpr(clazz, "readObject");
         call.addArgument(new StringLiteralExpr(classAndMethodName));
         call.addArgument(new IntegerLiteralExpr(index));
+        call.addArgument(new IntegerLiteralExpr(readIndex));
         CastExpr castExpr = new CastExpr(castType, call);
         if (isThis) {
             FieldAccessExpr fieldAccessExpr = new FieldAccessExpr(new ThisExpr(), variableName);
