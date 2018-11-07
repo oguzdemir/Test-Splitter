@@ -1,6 +1,6 @@
 <concurrent-hash-map>
   <entry>
-    <string>NumberTest_testMin</string>
+    <string>MinMaxTest_minMaxTest1</string>
     <map>
       <entry>
         <string>Integer</string>
