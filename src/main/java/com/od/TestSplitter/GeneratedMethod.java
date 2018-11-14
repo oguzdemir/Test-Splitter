@@ -104,8 +104,35 @@ public class GeneratedMethod {
 
     }
 
-    public void finalizeAssertions(String classPath) {
+    public void finalizeAssertions() {
+        if (combinedMethod) {
+            String fileName = classAndMethodName.split("_")[0] + "_" + methodDeclaration.getNameAsString();
 
+            methodDeclaration.getBody().get().getStatements().removeIf(s -> {
+                if (s.toString().contains("com.od.TestSplitter.Transformator.ObjectRecorder.writeObject") ||
+                        s.toString().contains("com.od.TestSplitter.Transformator.ObjectRecorder.finalizeWriting")) {
+                    return true;
+                }
+                return false;
+            });
+
+            for (Statement s : assertions) {
+                int count = 0;
+                if (s.toString().startsWith("assertEquals")) {
+                    MethodCallExpr exp = (MethodCallExpr) ((ExpressionStmt) s).getExpression();
+
+                    NameExpr clazz = new NameExpr("com.od.TestSplitter.Transformator.ObjectRecorder");
+                    MethodCallExpr call = new MethodCallExpr(clazz, "readObject");
+                    call.addArgument(new StringLiteralExpr(fileName));
+                    call.addArgument(new IntegerLiteralExpr(0));
+                    call.addArgument(new IntegerLiteralExpr(count++));
+
+                    exp.setArgument(0, call);
+
+                    methodDeclaration.getBody().get().addStatement(exp);
+                }
+            }
+        }
     }
 
     public List<String> getNeededVariables() {

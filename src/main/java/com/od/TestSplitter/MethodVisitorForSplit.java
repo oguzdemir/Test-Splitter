@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class MethodVisitorForSplit extends VoidVisitorAdapter<Object> {
@@ -24,7 +25,7 @@ public class MethodVisitorForSplit extends VoidVisitorAdapter<Object> {
     ClassOrInterfaceDeclaration cls;
     ArrayList<MethodDeclaration> originalMethodList;
     ArrayList<MethodDeclaration> generatedMethodList;
-    ArrayList<GeneratedMethod> allGeneratedMethods;
+    CopyOnWriteArrayList<GeneratedMethod> allGeneratedMethods;
     CompilationUnit cu;
     String path;
     public int methodCounter;
@@ -40,7 +41,7 @@ public class MethodVisitorForSplit extends VoidVisitorAdapter<Object> {
         this.generationInd = 1;
         this.originalMethodList = new ArrayList<>();
         this.generatedMethodList = new ArrayList<>();
-        this.allGeneratedMethods = new ArrayList<>();
+        this.allGeneratedMethods = new CopyOnWriteArrayList<>();
         this.count = 0;
     }
 
@@ -93,13 +94,14 @@ public class MethodVisitorForSplit extends VoidVisitorAdapter<Object> {
         });
     }
 
-    public void visitAllLast(String splittedClassPath) {
+    public void visitAllLast() {
         allGeneratedMethods.forEach(m -> {
-            m.finalizeAssertions(splittedClassPath);
+            m.finalizeAssertions();
         });
     }
 
     public void addGeneratedMethod(GeneratedMethod gm) {
+        allGeneratedMethods.add(gm);
         generatedMethodList.add(gm.getMethodDeclaration());
     }
 

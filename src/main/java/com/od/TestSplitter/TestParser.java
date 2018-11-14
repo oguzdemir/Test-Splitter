@@ -249,12 +249,13 @@ public class TestParser {
         scanner.next();
         for(MethodVisitorForSplit visitor: visitors) {
             ClassOrInterfaceDeclaration cls = visitor.cls;
+            List<MethodDeclaration> generatedMethodList = visitor.generatedMethodList;
             String path = visitor.path;
             String newClassPath = classPath.substring(0, classPath.length() - 1) + "_splitted/";
             CompilationUnit cu = visitor.cu;
-            visitor.visitAllLast(newClassPath);
+            visitor.visitAllLast();
             List<MethodDeclaration> originalMethodList = visitor.originalMethodList;
-            List<MethodDeclaration> generatedMethodList = visitor.generatedMethodList;
+
 
             //cls.setName(className);
 
