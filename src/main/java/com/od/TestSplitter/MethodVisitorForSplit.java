@@ -93,6 +93,12 @@ public class MethodVisitorForSplit extends VoidVisitorAdapter<Object> {
         });
     }
 
+    public void visitAllLast(String splittedClassPath) {
+        allGeneratedMethods.forEach(m -> {
+            m.finalizeAssertions(splittedClassPath);
+        });
+    }
+
     public void addGeneratedMethod(GeneratedMethod gm) {
         generatedMethodList.add(gm.getMethodDeclaration());
     }

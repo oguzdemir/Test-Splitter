@@ -1,6 +1,7 @@
 package com.od.TestSplitter;
 
 import com.github.javaparser.JavaParser;
+import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.VariableDeclarator;
@@ -28,15 +29,27 @@ import java.util.*;
 
 public class GeneratedMethod {
     private MethodDeclaration methodDeclaration;
+    private List<Statement> assertions;
     private List<Statement> statements;
     private List<String> neededVariables;
     private String classAndMethodName;
     private Map<String, String> neededVariablesTypes;
     private Map<String, String> fieldMap;
     private int fileIndex;
+    private boolean combinedMethod;
+    private int recordedAssertions;
+
+
+    private enum CombinationType {
+        NONE, SINGLE, PAIR_WISE
+    }
+    private static CombinationType combinationType = CombinationType.SINGLE;
 
     public GeneratedMethod(MethodDeclaration methodDeclaration, String classAndMethodName,
         Map<String, String> variableMap, int fileIndex, Map<String, String> fieldMap, boolean optimized) {
+        // This a constructor for pure (not combined) generated methods
+        combinedMethod = false;
+
         this.methodDeclaration = methodDeclaration;
         statements = methodDeclaration.getBody().get().getStatements();
         this.classAndMethodName = classAndMethodName;
@@ -58,6 +71,9 @@ public class GeneratedMethod {
     public GeneratedMethod(MethodDeclaration methodDeclaration, List<String> neededVariables,
                            String classAndMethodName, Map<String, String> neededVariablesTypes,
                            Map<String, String> fieldMap, int fileIndex, List<Expression> newStatements) {
+        // This is a constructor for combined methods
+        combinedMethod = true;
+
         this.methodDeclaration = methodDeclaration;
         statements = methodDeclaration.getBody().get().getStatements();
         this.neededVariables = neededVariables;
@@ -72,6 +88,23 @@ public class GeneratedMethod {
             this.neededVariablesTypes.put(((VariableDeclarationExpr) s).getVariable(0).getNameAsString(), "");
             block.addStatement(0, s);
         }
+
+        if (combinationType != CombinationType.NONE) {
+            //Extracting assertions
+            assertions = new ArrayList<>();
+            for (Statement s: methodDeclaration.getBody().get().getStatements()) {
+                if (s.toString().startsWith("assert")) {
+                    assertions.add(s);
+                }
+            }
+            for (Statement s: assertions) {
+                methodDeclaration.getBody().get().remove(s);
+            }
+        }
+
+    }
+
+    public void finalizeAssertions(String classPath) {
 
     }
 
@@ -113,6 +146,7 @@ public class GeneratedMethod {
         for (GeneratedMethod gm: methods) {
             int newMethodIndex = ++visitor.methodCounter;
             gm.methodDeclaration.setName("generatedU" + newMethodIndex);
+            gm.addWritesForAssertions();
             visitor.addGeneratedMethod(gm);
         }
     }
@@ -122,6 +156,35 @@ public class GeneratedMethod {
             neededVariablesTypes, fieldMap, fileIndex, expressions);
         gm.addReadStatements();
         return gm;
+    }
+
+    void addWritesForAssertions() {
+        int count = 0;
+        String fileName = classAndMethodName.split("_")[0] + "_" + methodDeclaration.getNameAsString();
+        for (Statement s: assertions) {
+            if (s.toString().startsWith("assertEquals")) {
+                Expression actual = ((MethodCallExpr) ((ExpressionStmt) s).getExpression()).getArgument(1);
+
+                NameExpr objectRecorderClass = new NameExpr(
+                        "com.od.TestSplitter.Transformator.ObjectRecorder");
+                MethodCallExpr writeCallExpr = new MethodCallExpr(objectRecorderClass, "writeObject");
+                writeCallExpr.addArgument(new StringLiteralExpr(fileName));
+                writeCallExpr.addArgument(actual);
+                writeCallExpr.addArgument(new IntegerLiteralExpr(0));
+                methodDeclaration.getBody().get().addStatement(writeCallExpr);
+                count++;
+            }
+        }
+
+        if (count > 0) {
+            NameExpr clazz = new NameExpr("com.od.TestSplitter.Transformator.ObjectRecorder");
+            MethodCallExpr call = new MethodCallExpr(clazz, "finalizeWriting");
+            call.addArgument(new StringLiteralExpr(fileName));
+            call.addArgument(new IntegerLiteralExpr(0));
+            methodDeclaration.getBody().get().addStatement(call);
+        }
+
+        recordedAssertions = count;
     }
 
     private List<GeneratedMethod> processCombinations(List<String> variableNames, List<String> shortTypeNames,List<String> fullTypeNames) {
@@ -134,13 +197,20 @@ public class GeneratedMethod {
             for (int iOptions = 0; iOptions < options1; iOptions++) {
                 List<Expression> statements = new ArrayList<>(2);
                 statements.add(toSpecificReadExpr(variableNames.get(i), shortTypeNames.get(i), fullTypeNames.get(i), iOptions));
-                allCombinations.add(createCombination(statements));
+
+                if (combinationType == CombinationType.SINGLE)
+                    allCombinations.add(createCombination(statements));
+
                 for (int j = i+1; j < variableNames.size(); j++) {
                     // Pairwise combination
                     int options2 = ObjectRecorder.readSpecificObjectCount(fullTypeNames.get(j));
                     for (int jOptions = 0; jOptions < options2; jOptions++) {
                         statements.add(toSpecificReadExpr(variableNames.get(j), shortTypeNames.get(j), fullTypeNames.get(j), jOptions));
-                        allCombinations.add(createCombination(statements));
+
+                        if (combinationType == CombinationType.PAIR_WISE) {
+                            allCombinations.add(createCombination(statements));
+                        }
+
                         statements.remove(1);
                     }
                 }
@@ -280,6 +350,16 @@ public class GeneratedMethod {
             });
         }
     }
+
+    private Expression toWriteExpr(String variable) {
+        NameExpr objectRecorderClass = new NameExpr(
+                "com.od.TestSplitter.Transformator.ObjectRecorder");
+        MethodCallExpr writeCallExpr = new MethodCallExpr(objectRecorderClass, "writeObject");
+        writeCallExpr.addArgument(new StringLiteralExpr(classAndMethodName));
+        writeCallExpr.addArgument(variable);
+        return writeCallExpr;
+    }
+
 
     /**
      * Creates a read expression to recover the state of a variable or state

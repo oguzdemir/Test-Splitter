@@ -244,10 +244,24 @@ public class TestParser {
             String newClassPath = classPath.substring(0, classPath.length() - 1) + "_splitted/";
             writeClassToFile(cu, path.replaceFirst(classPath, newClassPath));
 
-            if (record) {
-                //existingClasses.add(className);
-            }
         }
+        System.out.print("Press enter to continue execution after running the spllitted tests:");
+        scanner.next();
+        for(MethodVisitorForSplit visitor: visitors) {
+            ClassOrInterfaceDeclaration cls = visitor.cls;
+            String path = visitor.path;
+            String newClassPath = classPath.substring(0, classPath.length() - 1) + "_splitted/";
+            CompilationUnit cu = visitor.cu;
+            visitor.visitAllLast(newClassPath);
+            List<MethodDeclaration> originalMethodList = visitor.originalMethodList;
+            List<MethodDeclaration> generatedMethodList = visitor.generatedMethodList;
+
+            //cls.setName(className);
+
+            writeClassToFile(cu, path.replaceFirst(classPath, newClassPath));
+
+        }
+
         if (record) {
             FileWriter fileWriter = new FileWriter("existingTests.txt");
             for (String s : existingClasses) {
