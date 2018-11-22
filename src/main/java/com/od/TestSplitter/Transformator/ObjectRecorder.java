@@ -1,5 +1,6 @@
 package com.od.TestSplitter.Transformator;
 
+import com.od.TestSplitter.Config;
 import com.od.TestSplitter.TestParser;
 import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.converters.Converter;
@@ -13,6 +14,7 @@ import com.thoughtworks.xstream.io.HierarchicalStreamWriter;
 import com.thoughtworks.xstream.mapper.Mapper;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
+import org.xml.sax.InputSource;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -46,6 +48,7 @@ public class ObjectRecorder {
     private ConcurrentHashMap<String, Set<Object>> allObjects;
 
     private ConcurrentHashMap<String, HashMap<String,String>> typeMap;
+    private ConcurrentHashMap<String, Integer> typeCount;
 
     private ObjectRecorder() {
         SplitterJavaReflectionProvider splitterJavaReflectionProvider = new SplitterJavaReflectionProvider();
@@ -59,26 +62,26 @@ public class ObjectRecorder {
         readObjects = new ConcurrentHashMap<>();
         allObjects = new ConcurrentHashMap<>();
         typeMap = new ConcurrentHashMap<>();
+        typeCount = new ConcurrentHashMap<>();
 
-        File file = new File(SNAPSHOT_URL);
-        if (!file.exists()) {
-            file.mkdirs();
-        }
-
-        file = new File(SNAPSHOT_URL_COMBINATION);
-        if (!file.exists()) {
-            file.mkdirs();
-        }
-
-        Runtime.getRuntime().addShutdownHook(new Thread()
-        {
-            public void run()
-            {
-                System.err.println("Shutdown Hook is running for recording!");
-                ObjectRecorder.finalizeAll();
-                System.err.println("Application Terminating ...");
+        if (!Config.runningMainClass) {
+            File file = new File(SNAPSHOT_URL);
+            if (!file.exists()) {
+                file.mkdirs();
             }
-        });
+
+            file = new File(SNAPSHOT_URL_COMBINATION);
+            if (!file.exists()) {
+                file.mkdirs();
+            }
+            Runtime.getRuntime().addShutdownHook(new Thread() {
+                public void run() {
+                    System.err.println("Shutdown Hook is running for recording!");
+                    ObjectRecorder.finalizeAll();
+                    System.err.println("Application Terminating ...");
+                }
+            });
+        }
     }
 
     public static Converter getConverter(Class cls) {
@@ -102,6 +105,10 @@ public class ObjectRecorder {
 
             typeMap.get(classAndMethodName).put(object.getClass().getSimpleName(), className);
 
+
+            int count = typeCount.getOrDefault(className, 0);
+            typeCount.put(className, count + 1);
+
             if (object.getClass().toGenericString().contains("<"))
                 return;
             if (allObjects.containsKey(className)) {
@@ -110,6 +117,11 @@ public class ObjectRecorder {
                 HashSet<Object> objects = new HashSet<>();
                 objects.add(object);
                 allObjects.put(className, objects);
+            }
+
+            Set set = allObjects.get(className);
+            if (set != null) {
+                typeCount.put(className, set.size());
             }
         } catch (Exception e) {
 
@@ -133,6 +145,15 @@ public class ObjectRecorder {
         try {
             FileWriter fw = new FileWriter(new File(SNAPSHOT_URL_COMBINATION + "typeMap" + ".xml"));
             xstream.toXML( typeMap, fw);
+            fw.flush();
+            fw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            FileWriter fw = new FileWriter(new File(SNAPSHOT_URL_COMBINATION + "typeCount" + ".xml"));
+            xstream.toXML( typeCount, fw);
             fw.flush();
             fw.close();
         } catch (IOException e) {
@@ -207,26 +228,12 @@ public class ObjectRecorder {
         return instance.readSpecificObjectHelper(className, index);
     }
 
-    public static int readSpecificObjectCount(String className) {
-        Document doc;
-        int count = 0;
-        try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            doc = builder.parse(TestParser.repoPath + SNAPSHOT_URL_COMBINATION + className + ".xml");
-            for(int i = 0; i < doc.getChildNodes().item(0).getChildNodes().getLength(); i++) {
-                if (!doc.getChildNodes().item(0).getChildNodes().item(i).getNodeName().equals("#text")) {
-                    count++;
-                }
-            }
-        } catch (Exception e) {
-        }
-
-        return count;
-    }
-
     public static ConcurrentHashMap readTypeMap(String path) {
         return (ConcurrentHashMap) instance.xstream.fromXML(new File(path + SNAPSHOT_URL_COMBINATION + "typeMap" + ".xml"));
+    }
+
+    public static ConcurrentHashMap readCountMap(String path) {
+        return (ConcurrentHashMap) instance.xstream.fromXML(new File(path + SNAPSHOT_URL_COMBINATION + "typeCount" + ".xml"));
     }
 }
 
